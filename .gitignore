@@ -41,3 +41,64 @@ app-example
 # generated native folders
 /ios
 /android
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+ios/Pods/
+android/.gradle/
+android/build/
+android/app/build/
+
+# Build artifacts
+dist/
+build/
+*.class
+
+# Configuration files
+.env
+.env.local
+.env.*.local
+.expo/
+.vscode/
+!*.vscode/extensions.json # Allow committing recommended extensions
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Generated files
+coverage/
+*.tsbuildinfo
+*.js.map
+*.css.map
+
+# Xcode specific (iOS)
+ios/build/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/
+ios/*.xcodeproj/xcshareddata/
+ios/*.ipa
+ios/DerivedData/
+
+# Android specific
+android/app/src/main/assets/
+android/app/release-key.keystore
+android/app/*.jks
+android/local.properties
+android/*.iml
+
+# Package manager lock files (optional, depending on team preference)
+package-lock.json
+yarn.lock
