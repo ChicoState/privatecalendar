@@ -68,6 +68,7 @@ build/
 .env.*.local
 .expo/
 .vscode/
+.vscode/settings.json
 !*.vscode/extensions.json # Allow committing recommended extensions
 .idea/
 .DS_Store
