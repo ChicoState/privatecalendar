@@ -12,7 +12,7 @@ function App() {
           setSelected(day.dateString);
         }}
         markedDates={{
-          [selected]: { selected: true, disableTouchEvent: true, selectedDotColor: 'orange' }
+          [selected]: { selected: true, disableTouchEvent: true, selectedColor: 'orange' }
         }}
       />
     </SafeAreaView>
