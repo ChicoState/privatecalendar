@@ -51,7 +51,7 @@ export default function TabTwoScreen() {
         This app provides a task view for users to have ease of access to tasks they have created for themselves
         </ThemedText>
       </Collapsible>
-      <Collapsible title="Animations">
+      <Collapsible title="AddEvent/AddTask">
         <ThemedText>
         This app contains AddEvent and AddTask buttons for users to quickly add events and tasks on the fly for convenince.
         </ThemedText>
