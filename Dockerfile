@@ -9,7 +9,11 @@ RUN npm install
 
 COPY . .
 
-ENV HOST=0.0.0.0 PORT=8081
+ENV REACT_NATIVE_PACKAGER_HOSTNAME=0.0.0.0
 EXPOSE 8081
+EXPOSE 19000
+EXPOSE 19001
+EXPOSE 19006
 
-CMD [ "npx", "expo", "start"]
+ENTRYPOINT [ "npx", "expo", "start", "--web"]
+CMD [ ]
