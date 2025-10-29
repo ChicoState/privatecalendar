@@ -1,0 +1,19 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout the container
+      uses: actions/checkout@v4
+
+    - name: build the Docker image
+      run: docker build . -f Dockerfile -t private-calendar
