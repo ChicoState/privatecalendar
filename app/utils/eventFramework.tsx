@@ -18,20 +18,39 @@ export default class Event {
     private creator!: string; //name of event creator.
 
 
-    constructor( //set values that are absolutely necessary
-        id: string, 
-        Day: Date, 
+    constructor(
+        id: string,  
         Start: Date, 
         End: Date, 
         Sum: string,    
-        founder: string)
+        founder: string,
+        desc?: string,
+        loc?: string,
+        stat?:"CONFIRMED" | "CANCELLED" | "TENTATIVE",
+        recur?: string,
+        participantList?: string[],
+        )
     {
-        this.uid = id;
-        this.DTStamp = Day;
+        //required values
+        //Creates a random UID for the event, current date + random number
+        this.uid = `${Date.now()} - ${Math.floor(Math.random())*100000}`;
+        this.DTStamp = new Date(); //set current timestamp on creation
         this.DTstart = Start;
         this.DTend = End;
         this.summary = Sum;
         this.creator = founder;
+
+        // optional values
+
+        this.description = desc;
+        this.location = loc;
+        this.status = stat;
+        this.rRule = recur;
+        this.attendees = participantList;
     }
+
+
+
+    
 
 }
