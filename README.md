@@ -1,4 +1,5 @@
 # privatecalendar
+[![Docker Build](https://github.com/ChicoState/privatecalendar/actions/workflows/docker-build.yml/badge.svg)](https://github.com/ChicoState/privatecalendar/actions/workflows/docker-build.yml)
 
 A simple open source project for a Software Enginneering class
 
