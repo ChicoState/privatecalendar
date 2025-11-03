@@ -7,8 +7,8 @@ export default class Event {
 
     private uid!: string; //unique identifier for event
     private DTStamp!: Date; //when the event was last modified
-    private DTstart!: Date;//when the event begins
-    private DTend!: Date;//when the event ends
+    private DTstart!: string;//when the event begins
+    private DTend!: string;//when the event ends
     private summary!: string; //title of the even, e.x. "Trevor's Bday"
     private description?: string; //event details, e.x. "Bring cake"
     private location?: string;//where the event occurs.
@@ -17,11 +17,24 @@ export default class Event {
     private attendees?: string[]; //list of attendees.
     private creator!: string; //name of event creator.
 
+    defconstructor(){
+        this.uid = `${Date.now()}`;
+        this.DTStamp = new Date(); //set current timestamp on creation
+        this.DTstart = "TZID=America/New_York:20130802T103400";
+        this.DTend = "TZID=America/New_York:20130802T110400";
+        this.summary = "Event Name";
+        this.creator = "Sam";
+        this.description = "This is a test description";
+        this.location = "Somewhere";
+        this.status = "TENTATIVE";
+        this.rRule = "";
+        this.attendees = ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
+    }
 
     constructor(
         id: string,  
-        Start: Date, 
-        End: Date, 
+        Start: string, 
+        End: string, 
         Sum: string,    
         founder: string,
         desc?: string,
@@ -33,7 +46,7 @@ export default class Event {
     {
         //required values
         //Creates a random UID for the event, current date + random number
-        this.uid = `${Date.now()} - ${Math.floor(Math.random())*100000}`;
+        this.uid = `${Date.now()}`;
         this.DTStamp = new Date(); //set current timestamp on creation
         this.DTstart = Start;
         this.DTend = End;
@@ -48,9 +61,5 @@ export default class Event {
         this.rRule = recur;
         this.attendees = participantList;
     }
-
-
-
-    
 
 }

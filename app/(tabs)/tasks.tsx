@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Event from "../utils/eventFramework";
+import Events from "../utils/eventFramework";
 import {
   View,
   Text,
