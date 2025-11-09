@@ -62,4 +62,101 @@ export default class Event {
         this.attendees = participantList;
     }
 
+    /* Getters */
+
+    public getUid(): string {
+        return this.uid;
+    }
+
+    public getDTStamp(): Date {
+        return this.DTStamp;
+    }
+
+    public getDTstart(): string {
+        return this.DTstart;
+    }
+
+    public getDTend(): string {
+        return this.DTend;
+    }
+
+    public getSummary(): string {
+        return this.summary;
+    }
+
+    public getDescription(): string | undefined {
+        return this.description;
+    }
+    
+    public getLocation(): string | undefined {
+        return this.location;
+    }
+
+    public getStatus(): "CONFIRMED" | "CANCELLED" | "TENTATIVE" | undefined {
+        return this.status;
+    }
+    
+    public getRRule(): string | undefined {
+        return this.rRule;
+    }
+
+    public getAttendees(): string[] | undefined {
+        return this.attendees;
+    }
+
+    public getCreator(): string {
+        return this.creator;
+    }
+
+    /* Setters */
+    
+    public setDTStamp(stamp: Date): void {
+        this.DTStamp = stamp;
+    }
+
+    public setDTstart(Start: string): void {
+        this.DTstart = Start;
+        this.setDTStamp(new Date());
+    }
+
+    public setDTend(End: string): void {
+        this.DTend = End;
+        this.setDTStamp(new Date());
+    }
+
+    public setSummary(Sum: string): void {
+        this.summary = Sum;
+        this.setDTStamp(new Date());
+    }
+
+    public setDescription(Desc: string | undefined): void {
+        this.description = Desc;
+        this.setDTStamp(new Date());
+    }
+    
+    public setLocation(Loc: string | undefined): void {
+        this.location = Loc;
+        this.setDTStamp(new Date());
+    }
+
+    public setStatus(Stat: "CONFIRMED" | "CANCELLED" | "TENTATIVE"): void {
+        this.status = Stat;
+        this.setDTStamp(new Date());
+    }
+    
+    public setRRule(Recur: string | undefined): void {
+        this.rRule = Recur;
+        this.setDTStamp(new Date());
+    }
+
+    public setAttendees(List: string[] | undefined): void {
+        this.attendees = List;
+        this.setDTStamp(new Date());
+    }
+    
+    // Additional functionality. Should probably never be used
+    public setCreator(Founder: string): void {
+        this.creator = Founder;
+        this.setDTStamp(new Date());
+    }
 }
