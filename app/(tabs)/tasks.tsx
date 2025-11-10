@@ -42,6 +42,9 @@ const DEFAULT_TASK_DATA: TaskEventData = {
     attendees: "", 
 };
 
+// Define the available status options
+const STATUS_OPTIONS: TaskEventData['status'][] = ["TENTATIVE", "CONFIRMED", "CANCELLED"];
+
 // Task Page
 const App: React.FC = () => {
     const [tasks, setTasks] = useState<Event[]>([]); 
@@ -49,10 +52,15 @@ const App: React.FC = () => {
     const [editIndex, setEditIndex] = useState<number>(-1);
     const [modalVisible, setModalVisible] = useState<boolean>(false);
     const [advancedOptionsVisible, setAdvancedOptionsVisible] = useState<boolean>(false); 
+    const [statusDropdownVisible, setStatusDropdownVisible] = useState<boolean>(false);
 
     // Helper to update a specific field in the current taskData state
     const handleChange = (field: keyof TaskEventData, value: string) => {
-        setTaskData(prev => ({ ...prev, [field]: value }));
+        if (field === "status") {
+            setTaskData(prev => ({ ...prev, [field]: value as TaskEventData['status'] }));
+        } else {
+            setTaskData(prev => ({ ...prev, [field]: value }));
+        }
     };
 
     // Add Task 
@@ -60,6 +68,7 @@ const App: React.FC = () => {
         setTaskData(DEFAULT_TASK_DATA); 
         setEditIndex(-1);
         setAdvancedOptionsVisible(false); // Reset dropdown when opening for new task
+        setStatusDropdownVisible(false); 
         setModalVisible(true);
     };
 
@@ -75,14 +84,21 @@ const App: React.FC = () => {
             creator: taskToEdit.getCreator(),
             description: taskToEdit.getDescription() || "",
             location: taskToEdit.getLocation() || "",
-            status: taskToEdit.getStatus() || "TENTATIVE",
+            status: (taskToEdit.getStatus() || "TENTATIVE") as TaskEventData['status'],
             rRule: taskToEdit.getRRule() || "",
             attendees: taskToEdit.getAttendees() ? taskToEdit.getAttendees()!.join(", ") : "",
         });
 
         setEditIndex(index);
         setAdvancedOptionsVisible(false); // Reset dropdown when opening for editing
+        setStatusDropdownVisible(false); 
         setModalVisible(true);
+    };
+    
+    // Function to select an option from the custom dropdown
+    const handleSelectStatus = (status: TaskEventData['status']) => {
+        handleChange('status', status);
+        setStatusDropdownVisible(false); // Close the dropdown
     };
 
     // Save Task
@@ -302,14 +318,18 @@ const App: React.FC = () => {
                                     onChangeText={(text) => handleChange("attendees", text)}
                                 />
 
-                                <Text style={styles.inputLabel}>Status (CONFIRMED/CANCELLED/TENTATIVE)</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="TENTATIVE (Options: CONFIRMED, CANCELLED, TENTATIVE)"
-                                    placeholderTextColor="#aaa"
-                                    value={taskData.status}
-                                    onChangeText={(text) => handleChange("status", text as "CONFIRMED" | "CANCELLED" | "TENTATIVE")}
-                                />
+                                <Text style={styles.inputLabel}>Status</Text>
+                                <TouchableOpacity 
+                                    style={styles.customDropdownButton}
+                                    onPress={() => setStatusDropdownVisible(true)}
+                                >
+                                    <Text style={styles.customDropdownText}>{taskData.status}</Text>
+                                    <MaterialCommunityIcons 
+                                        name="chevron-down" 
+                                        size={24} 
+                                        color="#ccc" 
+                                    />
+                                </TouchableOpacity>
 
                                 <Text style={styles.inputLabel}>Recurrence Rule (RRule)</Text>
                                 <TextInput
@@ -341,12 +361,36 @@ const App: React.FC = () => {
             </View>
             </TouchableWithoutFeedback>
         </Modal>
+
+        {/* Custom Status Dropdown Modal */}
+        <Modal
+            animationType="fade"
+            transparent
+            visible={statusDropdownVisible}
+            onRequestClose={() => setStatusDropdownVisible(false)}
+        >
+            <TouchableWithoutFeedback onPress={() => setStatusDropdownVisible(false)}>
+                <View style={styles.dropdownOverlay}>
+                    <View style={styles.dropdownContainer}>
+                        {STATUS_OPTIONS.map((status) => (
+                            <TouchableOpacity
+                                key={status}
+                                style={styles.dropdownItem}
+                                onPress={() => handleSelectStatus(status)}
+                            >
+                                <Text style={styles.dropdownItemText}>{status}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </TouchableWithoutFeedback>
+        </Modal>
     </View>);
 };
 
 // CSS
 const styles = StyleSheet.create({
-    container: {flex: 1, padding: 40, marginTop: 40},
+    container: {flex: 1, padding: 40, marginTop: 40, backgroundColor: 'black'},
     title: { 
         fontSize: 24, 
         fontWeight: "bold", 
@@ -368,6 +412,45 @@ const styles = StyleSheet.create({
         fontSize: 16, 
         color: "white",
         backgroundColor: "#222" 
+    },
+    customDropdownButton: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderWidth: 1, 
+        borderColor: "#444", 
+        padding: 10,
+        marginBottom: 8, 
+        borderRadius: 8,
+        backgroundColor: "#222",
+    },
+    customDropdownText: {
+        fontSize: 16, 
+        color: "white",
+        fontWeight: 'bold',
+    },
+    dropdownOverlay: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    dropdownContainer: {
+        width: '70%',
+        backgroundColor: '#181818',
+        borderRadius: 10,
+        padding: 5,
+        borderWidth: 1,
+        borderColor: '#444',
+    },
+    dropdownItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#333',
+    },
+    dropdownItemText: {
+        color: 'white',
+        fontSize: 16,
     },
     addButton: {
         backgroundColor: "blue",
