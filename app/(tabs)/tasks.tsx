@@ -12,6 +12,7 @@ import {
   Keyboard,
   ScrollView, 
 } from "react-native";
+import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 
 // Define an interface to manage the full set of Event properties in state
 interface TaskEventData {
@@ -47,6 +48,7 @@ const App: React.FC = () => {
     const [taskData, setTaskData] = useState<TaskEventData>(DEFAULT_TASK_DATA); 
     const [editIndex, setEditIndex] = useState<number>(-1);
     const [modalVisible, setModalVisible] = useState<boolean>(false);
+    const [advancedOptionsVisible, setAdvancedOptionsVisible] = useState<boolean>(false); 
 
     // Helper to update a specific field in the current taskData state
     const handleChange = (field: keyof TaskEventData, value: string) => {
@@ -57,6 +59,7 @@ const App: React.FC = () => {
     const handleAddTask = () => {
         setTaskData(DEFAULT_TASK_DATA); 
         setEditIndex(-1);
+        setAdvancedOptionsVisible(false); // Reset dropdown when opening for new task
         setModalVisible(true);
     };
 
@@ -78,6 +81,7 @@ const App: React.FC = () => {
         });
 
         setEditIndex(index);
+        setAdvancedOptionsVisible(false); // Reset dropdown when opening for editing
         setModalVisible(true);
     };
 
@@ -194,14 +198,27 @@ const App: React.FC = () => {
         visible={modalVisible}
         onRequestClose={handleCancel}
         >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        {/*
+            ISSUE FIX: The issue with clicking on the box while scrolling is likely the TouchableWithoutFeedback.
+            When you scroll, you are touching the area covered by the modal backdrop, which the TWB interprets as 
+            a tap if the touch event isn't fully consumed by the ScrollView.
+            
+            We wrap the modal content with TWB to dismiss the keyboard, not the modal.
+            The ScrollView itself is what allows scrolling of the content.
+        */}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.modalBackdrop}>
-                <ScrollView contentContainerStyle={styles.modalScroll}>
+                {/* The ScrollView ensures proper scrolling of the form content */}
+                <ScrollView 
+                    contentContainerStyle={styles.modalScroll}
+                    keyboardShouldPersistTaps="handled" // Important for TWB + inputs
+                >
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>
                             {editIndex !== -1 ? "Edit Event/Task" : "Add Event/Task"}
                         </Text>
                         
+                        {/* --- BASIC OPTIONS --- */}
                         <Text style={styles.inputLabel}>Summary (Required)</Text>
                         <TextInput
                             style={styles.input}
@@ -214,12 +231,13 @@ const App: React.FC = () => {
 
                         <Text style={styles.inputLabel}>Description</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, { height: 80 }]}
                             placeholder="e.g., Need to include Q3 data."
                             placeholderTextColor="#aaa"
                             value={taskData.description}
                             onChangeText={(text) => handleChange("description", text)}
                             multiline
+                            numberOfLines={3} // Added for better UX on multiline
                         />
                         
                         <Text style={styles.inputLabel}>Location</Text>
@@ -249,43 +267,63 @@ const App: React.FC = () => {
                             onChangeText={(text) => handleChange("DTend", text)}
                         />
 
-                        <Text style={styles.inputLabel}>Creator</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Your Name"
-                            placeholderTextColor="#aaa"
-                            value={taskData.creator}
-                            onChangeText={(text) => handleChange("creator", text)}
-                        />
-                        
-                        <Text style={styles.inputLabel}>Attendees (Comma-separated)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="e.g., Alice, Bob, Charlie"
-                            placeholderTextColor="#aaa"
-                            value={taskData.attendees}
-                            onChangeText={(text) => handleChange("attendees", text)}
-                        />
+                        {/* --- ADVANCED OPTIONS DROPDOWN --- */}
+                        <TouchableOpacity 
+                            style={styles.advancedToggle} 
+                            onPress={() => setAdvancedOptionsVisible(!advancedOptionsVisible)}
+                        >
+                            <Text style={styles.advancedToggleText}>
+                                Advanced Options
+                            </Text>
+                            <MaterialCommunityIcons 
+                                name={advancedOptionsVisible ? "chevron-up" : "chevron-down"} 
+                                size={24} 
+                                color="#66c" 
+                            />
+                        </TouchableOpacity>
 
-                        <Text style={styles.inputLabel}>Status (CONFIRMED/CANCELLED/TENTATIVE)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="TENTATIVE"
-                            placeholderTextColor="#aaa"
-                            value={taskData.status}
-                            onChangeText={(text) => handleChange("status", text as "CONFIRMED" | "CANCELLED" | "TENTATIVE")}
-                        />
+                        {advancedOptionsVisible && (
+                            <View>
+                                <Text style={styles.inputLabel}>Creator</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Your Name"
+                                    placeholderTextColor="#aaa"
+                                    value={taskData.creator}
+                                    onChangeText={(text) => handleChange("creator", text)}
+                                />
+                                
+                                <Text style={styles.inputLabel}>Attendees (Comma-separated)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g., Alice, Bob, Charlie"
+                                    placeholderTextColor="#aaa"
+                                    value={taskData.attendees}
+                                    onChangeText={(text) => handleChange("attendees", text)}
+                                />
 
-                        <Text style={styles.inputLabel}>Recurrence Rule (RRule)</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="e.g., FREQ=WEEKLY;BYDAY=MO"
-                            placeholderTextColor="#aaa"
-                            value={taskData.rRule}
-                            onChangeText={(text) => handleChange("rRule", text)}
-                            returnKeyType="done"
-                            onSubmitEditing={handleSaveTask}
-                        />
+                                <Text style={styles.inputLabel}>Status (CONFIRMED/CANCELLED/TENTATIVE)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="TENTATIVE (Options: CONFIRMED, CANCELLED, TENTATIVE)"
+                                    placeholderTextColor="#aaa"
+                                    value={taskData.status}
+                                    onChangeText={(text) => handleChange("status", text as "CONFIRMED" | "CANCELLED" | "TENTATIVE")}
+                                />
+
+                                <Text style={styles.inputLabel}>Recurrence Rule (RRule)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="e.g., FREQ=WEEKLY;BYDAY=MO"
+                                    placeholderTextColor="#aaa"
+                                    value={taskData.rRule}
+                                    onChangeText={(text) => handleChange("rRule", text)}
+                                    returnKeyType="done"
+                                    onSubmitEditing={handleSaveTask}
+                                />
+                            </View>
+                        )}
+                        {/* --- END ADVANCED OPTIONS --- */}
 
                         <View style={styles.modalButtons}>
                             <TouchableOpacity style={[styles.btn, styles.btnCancel]} onPress={handleCancel}>
@@ -370,6 +408,23 @@ const styles = StyleSheet.create({
         padding: 20,
     },
     modalTitle: {color: "white", fontSize: 22, fontWeight: "bold", marginBottom: 16},
+    advancedToggle: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 15,
+        marginBottom: 5,
+        paddingVertical: 8,
+        paddingHorizontal: 5,
+        borderTopWidth: 1,
+        borderBottomWidth: 1,
+        borderColor: '#444',
+    },
+    advancedToggleText: {
+        color: "#66c",
+        fontSize: 16,
+        fontWeight: "bold",
+    },
     modalButtons: {flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 10},
     btn: {paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8},
     btnCancel: {backgroundColor: "#555"}, 
