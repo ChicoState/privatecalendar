@@ -5,6 +5,7 @@ and allows it to be used elsewhere.
 export default class Event {
     // Variables directly follow .ics format
 
+    private type!: "VEVENT" | "VTODO" // can only be one of two things
     private uid!: string; //unique identifier for event
     private DTStamp!: Date; //when the event was last modified
     private DTstart!: string;//when the event begins
@@ -13,11 +14,13 @@ export default class Event {
     private description?: string; //event details, e.x. "Bring cake"
     private location?: string;//where the event occurs.
     private status?: "CONFIRMED" | "CANCELLED" | "TENTATIVE"; //status can only be one of three things.
+    private statusTODO?: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" // can only be on of four things
     private rRule?: string; //used to set event frequency e.x. "FREQ=WEEKLY;BYDAY=MO".
     private attendees?: string[]; //list of attendees.
     private creator!: string; //name of event creator.
 
     defconstructor(){
+        this.type = "VEVENT"
         this.uid = `${Date.now()}`;
         this.DTStamp = new Date(); //set current timestamp on creation
         this.DTstart = "TZID=America/New_York:20130802T103400";
@@ -27,11 +30,13 @@ export default class Event {
         this.description = "This is a test description";
         this.location = "Somewhere";
         this.status = "TENTATIVE";
+        this.statusTODO = "NEEDS-ACTION"
         this.rRule = "";
         this.attendees = ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
     }
 
     constructor(
+        type: "VEVENT" | "VTODO",
         id: string,  
         Start: string, 
         End: string, 
@@ -40,12 +45,14 @@ export default class Event {
         desc?: string,
         loc?: string,
         stat?:"CONFIRMED" | "CANCELLED" | "TENTATIVE",
+        statTODO?: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED",
         recur?: string,
         participantList?: string[],
         )
     {
         //required values
         //Creates a random UID for the event, current date + random number
+        this.type = type
         this.uid = `${Date.now()}`;
         this.DTStamp = new Date(); //set current timestamp on creation
         this.DTstart = Start;
@@ -58,11 +65,16 @@ export default class Event {
         this.description = desc;
         this.location = loc;
         this.status = stat;
+        this.statusTODO = statTODO
         this.rRule = recur;
         this.attendees = participantList;
     }
 
     /* Getters */
+
+    public getType(): "VEVENT" | "VTODO" | undefined {
+        return this.type
+    }
 
     public getUid(): string {
         return this.uid;
@@ -94,6 +106,10 @@ export default class Event {
 
     public getStatus(): "CONFIRMED" | "CANCELLED" | "TENTATIVE" | undefined {
         return this.status;
+    }
+
+    public getStatusTODO(): "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" | undefined {
+        return this.statusTODO;
     }
     
     public getRRule(): string | undefined {
@@ -141,6 +157,11 @@ export default class Event {
 
     public setStatus(Stat: "CONFIRMED" | "CANCELLED" | "TENTATIVE"): void {
         this.status = Stat;
+        this.setDTStamp(new Date());
+    }
+
+    public setStatusTODO(Stat: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED"): void {
+        this.statusTODO = Stat;
         this.setDTStamp(new Date());
     }
     

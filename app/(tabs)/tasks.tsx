@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Define an interface to manage the full set of Event properties in state
 interface TaskEventData {
+    type: "VEVENT" | "VTODO"
     id: string;
     summary: string;
     DTstart: string;
@@ -25,12 +26,14 @@ interface TaskEventData {
     description: string;
     location: string;
     status: "CONFIRMED" | "CANCELLED" | "TENTATIVE";
+    statusTODO: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED";
     rRule: string;
     attendees: string;
 }
 
 // Default values for a new task/event
 const DEFAULT_TASK_DATA: TaskEventData = {
+    type: "VTODO",
     id: "", 
     summary: "",
     DTstart: "20251108T100000",
@@ -39,12 +42,13 @@ const DEFAULT_TASK_DATA: TaskEventData = {
     description: "",
     location: "",
     status: "TENTATIVE",
+    statusTODO: "NEEDS-ACTION",
     rRule: "",
     attendees: "", 
 };
 
 // Define the available status options
-const STATUS_OPTIONS: TaskEventData['status'][] = ["TENTATIVE", "CONFIRMED", "CANCELLED"];
+const STATUS_OPTIONS: TaskEventData['statusTODO'][] = ["NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED"];
 
 // Task Page
 const App: React.FC = () => {
@@ -78,6 +82,7 @@ const App: React.FC = () => {
         const taskToEdit = tasks[index]; 
         
         setTaskData({
+            type: (taskToEdit.getType() || "VTODO") as TaskEventData['type'],
             id: taskToEdit.getUid(),
             summary: taskToEdit.getSummary(),
             DTstart: taskToEdit.getDTstart(),
@@ -86,6 +91,7 @@ const App: React.FC = () => {
             description: taskToEdit.getDescription() || "",
             location: taskToEdit.getLocation() || "",
             status: (taskToEdit.getStatus() || "TENTATIVE") as TaskEventData['status'],
+            statusTODO: (taskToEdit.getStatusTODO() || "NEEDS-ACTION") as TaskEventData['statusTODO'],
             rRule: taskToEdit.getRRule() || "",
             attendees: taskToEdit.getAttendees() ? taskToEdit.getAttendees()!.join(", ") : "",
         });
@@ -97,8 +103,8 @@ const App: React.FC = () => {
     };
     
     // Function to select an option from the custom dropdown
-    const handleSelectStatus = (status: TaskEventData['status']) => {
-        handleChange('status', status);
+    const handleSelectStatus = (status: TaskEventData['statusTODO']) => {
+        handleChange('statusTODO', status);
         setStatusDropdownVisible(false); // Close the dropdown
     };
 
@@ -121,7 +127,7 @@ const App: React.FC = () => {
             existingTask.setDTstart(taskData.DTstart);
             existingTask.setDTend(taskData.DTend);
             existingTask.setCreator(taskData.creator);
-            existingTask.setStatus(taskData.status);
+            existingTask.setStatusTODO(taskData.statusTODO);
             existingTask.setRRule(taskData.rRule || undefined);
             existingTask.setAttendees(participantList.length > 0 ? participantList : undefined);
 
@@ -129,6 +135,7 @@ const App: React.FC = () => {
 
         } else {
             const newEvent = new Event(
+                taskData.type,
                 taskData.id,
                 taskData.DTstart,
                 taskData.DTend,
@@ -137,6 +144,7 @@ const App: React.FC = () => {
                 taskData.description || undefined,
                 taskData.location || undefined,
                 taskData.status,
+                taskData.statusTODO,
                 taskData.rRule || undefined,
                 participantList.length > 0 ? participantList : undefined
             );
@@ -312,12 +320,12 @@ const App: React.FC = () => {
                                     onChangeText={(text) => handleChange("attendees", text)}
                                 />
 
-                                <Text style={styles.inputLabel}>Status (Note: change this to task, not event status)</Text>
+                                <Text style={styles.inputLabel}>Status</Text>
                                 <TouchableOpacity 
                                     style={styles.customDropdownButton}
                                     onPress={() => setStatusDropdownVisible(true)}
                                 >
-                                    <Text style={styles.customDropdownText}>{taskData.status}</Text>
+                                    <Text style={styles.customDropdownText}>{taskData.statusTODO}</Text>
                                     <MaterialCommunityIcons 
                                         name="chevron-down" 
                                         size={24} 
@@ -376,13 +384,13 @@ const App: React.FC = () => {
             <TouchableWithoutFeedback onPress={() => setStatusDropdownVisible(false)}>
                 <View style={styles.dropdownOverlay}>
                     <View style={styles.dropdownContainer}>
-                        {STATUS_OPTIONS.map((status) => (
+                        {STATUS_OPTIONS.map((statusTODO) => (
                             <TouchableOpacity
-                                key={status}
+                                key={statusTODO}
                                 style={styles.dropdownItem}
-                                onPress={() => handleSelectStatus(status)}
+                                onPress={() => handleSelectStatus(statusTODO)}
                             >
-                                <Text style={styles.dropdownItemText}>{status}</Text>
+                                <Text style={styles.dropdownItemText}>{statusTODO}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
