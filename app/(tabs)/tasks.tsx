@@ -214,20 +214,11 @@ const App: React.FC = () => {
         visible={modalVisible}
         onRequestClose={handleCancel}
         >
-        {/*
-            ISSUE FIX: The issue with clicking on the box while scrolling is likely the TouchableWithoutFeedback.
-            When you scroll, you are touching the area covered by the modal backdrop, which the TWB interprets as 
-            a tap if the touch event isn't fully consumed by the ScrollView.
-            
-            We wrap the modal content with TWB to dismiss the keyboard, not the modal.
-            The ScrollView itself is what allows scrolling of the content.
-        */}
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
             <View style={styles.modalBackdrop}>
-                {/* The ScrollView ensures proper scrolling of the form content */}
                 <ScrollView 
                     contentContainerStyle={styles.modalScroll}
-                    keyboardShouldPersistTaps="handled" // Important for TWB + inputs
+                    keyboardShouldPersistTaps="handled"
                 >
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>
@@ -235,31 +226,20 @@ const App: React.FC = () => {
                         </Text>
                         
                         {/* --- BASIC OPTIONS --- */}
-                        <Text style={styles.inputLabel}>Summary (Required)</Text>
+                        <Text style={styles.inputLabel}>Title (Required)</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="e.g., Finish report by EOD"
+                            placeholder="New Task"
                             placeholderTextColor="#aaa"
                             value={taskData.summary}
                             onChangeText={(text) => handleChange("summary", text)}
                             autoFocus
                         />
-
-                        <Text style={styles.inputLabel}>Description</Text>
-                        <TextInput
-                            style={[styles.input, { height: 80 }]}
-                            placeholder="e.g., Need to include Q3 data."
-                            placeholderTextColor="#aaa"
-                            value={taskData.description}
-                            onChangeText={(text) => handleChange("description", text)}
-                            multiline
-                            numberOfLines={3} // Added for better UX on multiline
-                        />
                         
                         <Text style={styles.inputLabel}>Location</Text>
                         <TextInput
                             style={styles.input}
-                            placeholder="e.g., Home Office"
+                            placeholder=""
                             placeholderTextColor="#aaa"
                             value={taskData.location}
                             onChangeText={(text) => handleChange("location", text)}
@@ -283,6 +263,17 @@ const App: React.FC = () => {
                             onChangeText={(text) => handleChange("DTend", text)}
                         />
 
+                        <Text style={styles.inputLabel}>Description</Text>
+                        <TextInput
+                            style={[styles.input, { height: 80 }]}
+                            placeholder=""
+                            placeholderTextColor="#aaa"
+                            value={taskData.description}
+                            onChangeText={(text) => handleChange("description", text)}
+                            multiline
+                            numberOfLines={3}
+                        />
+
                         {/* --- ADVANCED OPTIONS DROPDOWN --- */}
                         <TouchableOpacity 
                             style={styles.advancedToggle} 
@@ -300,25 +291,16 @@ const App: React.FC = () => {
 
                         {advancedOptionsVisible && (
                             <View>
-                                <Text style={styles.inputLabel}>Creator</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Your Name"
-                                    placeholderTextColor="#aaa"
-                                    value={taskData.creator}
-                                    onChangeText={(text) => handleChange("creator", text)}
-                                />
-                                
                                 <Text style={styles.inputLabel}>Attendees (Comma-separated)</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="e.g., Alice, Bob, Charlie"
+                                    placeholder=""
                                     placeholderTextColor="#aaa"
                                     value={taskData.attendees}
                                     onChangeText={(text) => handleChange("attendees", text)}
                                 />
 
-                                <Text style={styles.inputLabel}>Status</Text>
+                                <Text style={styles.inputLabel}>Status (Note: change this to task, not event status)</Text>
                                 <TouchableOpacity 
                                     style={styles.customDropdownButton}
                                     onPress={() => setStatusDropdownVisible(true)}
@@ -331,7 +313,7 @@ const App: React.FC = () => {
                                     />
                                 </TouchableOpacity>
 
-                                <Text style={styles.inputLabel}>Recurrence Rule (RRule)</Text>
+                                <Text style={styles.inputLabel}>Recurrence Rule</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="e.g., FREQ=WEEKLY;BYDAY=MO"
