@@ -10,7 +10,8 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Keyboard,
-  ScrollView, 
+  ScrollView,
+  Touchable, 
 } from "react-native";
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 
@@ -163,28 +164,39 @@ const App: React.FC = () => {
         if (editIndex === index) setEditIndex(-1);
     };
 
+    // Deletes Task Modal handeler
+    const handleModalDelete = () => {
+        if (editIndex !== -1) {
+            handleDeleteTask(editIndex);
+            setModalVisible(false);
+        }
+    };
+
     type ItemProps = { item: Event; index: number }; 
 
     const renderItem = ({ item, index }: ItemProps) => {
         const summary = item.getSummary();
-        const creator = item.getCreator();
+        const location = item.getLocation();
+        const dtend = item.getDTend();
 
         return (
             <View style={styles.task}>
                 <View style={{ flexShrink: 1 }}>
                     <Text style={styles.itemList}>{summary || "No Title"} </Text>
-                    {creator && (
+                    {location && (
                         <Text style={{ ...styles.itemList, fontSize: 14, color: '#aaa' }}>
-                            Created by: {creator}
+                            Location: {location}
+                        </Text>
+                    )}
+                    {dtend && (
+                        <Text style={{ ...styles.itemList, fontSize: 14, color: '#aaa' }}>
+                            Due Date: {dtend}
                         </Text>
                     )}
                 </View>
                 <View style={styles.taskButtons}>
-                    <TouchableOpacity onPress={() => handleEditTask(index)}>
-                        <Text style={styles.editButton}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => handleDeleteTask(index)}>
-                        <Text style={styles.deleteButton}>Delete</Text>
+                    <TouchableOpacity onPress={() => handleEditTask(index)} style={styles.iconButton}>
+                        <MaterialCommunityIcons name="pencil" size={24} color="#5cb85c" /> 
                     </TouchableOpacity>
                 </View>
             </View>
@@ -328,6 +340,16 @@ const App: React.FC = () => {
                         {/* --- END ADVANCED OPTIONS --- */}
 
                         <View style={styles.modalButtons}>
+                            {editIndex !== -1 ? (
+                                <TouchableOpacity
+                                    style={styles.deleteModalButton}
+                                    onPress={handleModalDelete}
+                                >
+                                    <MaterialCommunityIcons name="trash-can" size={24} color="red"/>
+                                </TouchableOpacity>
+                            ): null}
+
+                            <View style={{flex: 1}} />
                             <TouchableOpacity style={[styles.btn, styles.btnCancel]} onPress={handleCancel}>
                                 <Text style={styles.btnText}>Cancel</Text>
                             </TouchableOpacity>
@@ -444,9 +466,13 @@ const styles = StyleSheet.create({
         fontWeight: "bold",
         textAlign: "center",
         fontSize: 18},
-    taskButtons: {flexDirection: "row"},
-    editButton: {marginRight: 10, color: "green", fontWeight: "bold", fontSize: 18},
-    deleteButton: {color: "red", fontWeight: "bold", fontSize: 18},
+    taskButtons: {
+        flexDirection: "row",
+        alignItems: 'center',
+    },
+    iconButton: {
+        padding: 5,
+    },
     task: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -490,7 +516,15 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "bold",
     },
-    modalButtons: {flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 10},
+    modalButtons: {
+        flexDirection: "row", 
+        justifyContent: "space-between",
+        alignItems: "center", 
+        marginTop: 20,
+    },
+    deleteModalButton: {
+        padding: 10,
+    },
     btn: {paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8},
     btnCancel: {backgroundColor: "#555"}, 
     btnSave: {backgroundColor: "blue"},
