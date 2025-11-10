@@ -15,6 +15,7 @@ export default class Event {
     private location?: string;//where the event occurs.
     private status?: "CONFIRMED" | "CANCELLED" | "TENTATIVE"; //status can only be one of three things.
     private statusTODO?: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" // can only be on of four things
+    private priority: number = 0;
     private rRule?: string; //used to set event frequency e.x. "FREQ=WEEKLY;BYDAY=MO".
     private attendees?: string[]; //list of attendees.
     private creator!: string; //name of event creator.
@@ -30,7 +31,8 @@ export default class Event {
         this.description = "This is a test description";
         this.location = "Somewhere";
         this.status = "TENTATIVE";
-        this.statusTODO = "NEEDS-ACTION"
+        this.statusTODO = "NEEDS-ACTION";
+        this.priority = 0;
         this.rRule = "";
         this.attendees = ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
     }
@@ -46,6 +48,7 @@ export default class Event {
         loc?: string,
         stat?:"CONFIRMED" | "CANCELLED" | "TENTATIVE",
         statTODO?: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED",
+        priority: number = 0,
         recur?: string,
         participantList?: string[],
         )
@@ -66,6 +69,7 @@ export default class Event {
         this.location = loc;
         this.status = stat;
         this.statusTODO = statTODO
+        this.priority = priority
         this.rRule = recur;
         this.attendees = participantList;
     }
@@ -110,6 +114,10 @@ export default class Event {
 
     public getStatusTODO(): "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" | undefined {
         return this.statusTODO;
+    }
+
+    public getPriority(): number {
+        return this.priority;
     }
     
     public getRRule(): string | undefined {
@@ -162,6 +170,17 @@ export default class Event {
 
     public setStatusTODO(Stat: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED"): void {
         this.statusTODO = Stat;
+        this.setDTStamp(new Date());
+    }
+
+    public setPriority(Prio: number): void {
+        if(Prio >= 10) {
+            this.priority = 0;
+        }
+        if(Prio <= -1) {
+            this.priority = 0;
+        }
+        this.priority = Prio;
         this.setDTStamp(new Date());
     }
     
