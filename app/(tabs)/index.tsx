@@ -93,12 +93,14 @@ export default function CalendarScreen() {
       onIndexChange={setIndex}
       initialLayout={{ width: layout.width }}
       renderTabBar={(props) => (
-        <TabBar
-          {...props}
-          style={styles.tabBar}
-          indicatorStyle={styles.indicator}
-        //  labelStyle={styles.label}
-        />
+        <SafeAreaView>
+          <TabBar
+            {...props}
+            style={styles.tabBar}
+            indicatorStyle={styles.indicator}
+          //  labelStyle={styles.label}
+          />
+        </SafeAreaView>
       )}
     />
   );
