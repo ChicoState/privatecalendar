@@ -14,7 +14,7 @@ export default class Event {
     private description?: string; //event details, e.x. "Bring cake"
     private location?: string;//where the event occurs.
     private status?: "CONFIRMED" | "CANCELLED" | "TENTATIVE"; //status can only be one of three things.
-    private statusTODO?: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" // can only be on of four things
+    private statusToDo?: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" // can only be on of four things
     private priority: number = 0;
     private rRule?: string; //used to set event frequency e.x. "FREQ=WEEKLY;BYDAY=MO".
     private attendees?: string[]; //list of attendees.
@@ -31,7 +31,7 @@ export default class Event {
         this.description = "This is a test description";
         this.location = "Somewhere";
         this.status = "TENTATIVE";
-        this.statusTODO = "NEEDS-ACTION";
+        this.statusToDo = "NEEDS-ACTION";
         this.priority = 0;
         this.rRule = "";
         this.attendees = ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
@@ -68,7 +68,7 @@ export default class Event {
         this.description = desc;
         this.location = loc;
         this.status = stat;
-        this.statusTODO = statTODO
+        this.statusToDo = statTODO
         this.priority = priority
         this.rRule = recur;
         this.attendees = participantList;
@@ -112,8 +112,8 @@ export default class Event {
         return this.status;
     }
 
-    public getStatusTODO(): "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" | undefined {
-        return this.statusTODO;
+    public getstatusToDo(): "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" | undefined {
+        return this.statusToDo;
     }
 
     public getPriority(): number {
@@ -168,8 +168,8 @@ export default class Event {
         this.setDTStamp(new Date());
     }
 
-    public setStatusTODO(Stat: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED"): void {
-        this.statusTODO = Stat;
+    public setstatusToDo(Stat: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED"): void {
+        this.statusToDo = Stat;
         this.setDTStamp(new Date());
     }
 
