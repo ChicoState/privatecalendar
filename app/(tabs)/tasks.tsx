@@ -26,7 +26,7 @@ interface TaskEventData {
     description: string;
     location: string;
     status: "CONFIRMED" | "CANCELLED" | "TENTATIVE";
-    statusTODO: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED";
+    statusToDo: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED";
     priority: number
     rRule: string;
     attendees: string;
@@ -43,14 +43,14 @@ const DEFAULT_TASK_DATA: TaskEventData = {
     description: "",
     location: "",
     status: "TENTATIVE",
-    statusTODO: "NEEDS-ACTION",
+    statusToDo: "NEEDS-ACTION",
     priority: 0,
     rRule: "",
     attendees: "", 
 };
 
 // Define the available status options
-const STATUS_OPTIONS: TaskEventData['statusTODO'][] = ["NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED"];
+const STATUS_OPTIONS: TaskEventData['statusToDo'][] = ["NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED"];
 
 const PRIORITY_OPTIONS = [
     { label: "No Preference", value: 0},
@@ -102,7 +102,7 @@ const App: React.FC = () => {
             description: taskToEdit.getDescription() || "",
             location: taskToEdit.getLocation() || "",
             status: (taskToEdit.getStatus() || "TENTATIVE") as TaskEventData['status'],
-            statusTODO: (taskToEdit.getStatusTODO() || "NEEDS-ACTION") as TaskEventData['statusTODO'],
+            statusToDo: (taskToEdit.getstatusToDo() || "NEEDS-ACTION") as TaskEventData['statusToDo'],
             priority: (taskToEdit.getPriority()),
             rRule: taskToEdit.getRRule() || "",
             attendees: taskToEdit.getAttendees() ? taskToEdit.getAttendees()!.join(", ") : "",
@@ -116,8 +116,8 @@ const App: React.FC = () => {
     };
     
     // Function to select an option from the custom status dropdown
-    const handleSelectStatus = (status: TaskEventData['statusTODO']) => {
-        handleChange('statusTODO', status);
+    const handleSelectStatus = (status: TaskEventData['statusToDo']) => {
+        handleChange('statusToDo', status);
         setStatusDropdownVisible(false); // Close the dropdown
     };
 
@@ -146,7 +146,7 @@ const App: React.FC = () => {
             existingTask.setDTstart(taskData.DTstart);
             existingTask.setDTend(taskData.DTend);
             existingTask.setCreator(taskData.creator);
-            existingTask.setStatusTODO(taskData.statusTODO);
+            existingTask.setstatusToDo(taskData.statusToDo);
             existingTask.setPriority(taskData.priority);
             existingTask.setRRule(taskData.rRule || undefined);
             existingTask.setAttendees(participantList.length > 0 ? participantList : undefined);
@@ -164,7 +164,7 @@ const App: React.FC = () => {
                 taskData.description || undefined,
                 taskData.location || undefined,
                 taskData.status,
-                taskData.statusTODO,
+                taskData.statusToDo,
                 taskData.priority,
                 taskData.rRule || undefined,
                 participantList.length > 0 ? participantList : undefined
@@ -346,7 +346,7 @@ const App: React.FC = () => {
                                     style={styles.customDropdownButton}
                                     onPress={() => setStatusDropdownVisible(true)}
                                 >
-                                    <Text style={styles.customDropdownText}>{taskData.statusTODO}</Text>
+                                    <Text style={styles.customDropdownText}>{taskData.statusToDo}</Text>
                                     <MaterialCommunityIcons 
                                         name="chevron-down" 
                                         size={24} 
@@ -420,13 +420,13 @@ const App: React.FC = () => {
             <TouchableWithoutFeedback onPress={() => setStatusDropdownVisible(false)}>
                 <View style={styles.dropdownOverlay}>
                     <View style={styles.dropdownContainer}>
-                        {STATUS_OPTIONS.map((statusTODO) => (
+                        {STATUS_OPTIONS.map((statusToDo) => (
                             <TouchableOpacity
-                                key={statusTODO}
+                                key={statusToDo}
                                 style={styles.dropdownItem}
-                                onPress={() => handleSelectStatus(statusTODO)}
+                                onPress={() => handleSelectStatus(statusToDo)}
                             >
-                                <Text style={styles.dropdownItemText}>{statusTODO}</Text>
+                                <Text style={styles.dropdownItemText}>{statusToDo}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
