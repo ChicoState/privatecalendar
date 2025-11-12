@@ -107,7 +107,7 @@ export default function App() {
   const [events, setEvents] = useState<EventsByDate>({});
 
   // simple form
-  const [title, setTitle] = useState('New Event');
+  const [title, setTitle] = useState('');
   const [allDay, setAllDay] = useState(false);
   const [startHour, setStartHour] = useState('10:00'); // HH:mm local
   const [endHour, setEndHour] = useState('11:00');
