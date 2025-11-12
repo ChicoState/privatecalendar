@@ -1,27 +1,40 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Button, TextInput, Switch, Platform, KeyboardAvoidingView, ScrollView, Alert } from 'react-native';
+import {
+  StyleSheet,
+  Button,
+  TextInput,
+  Switch,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
+  View,
+  Dimensions,
+  ScrollView,
+  Text,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
+import { TabView, TabBar } from 'react-native-tab-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
+// --- Types ---
 type DayPress = { dateString: string; day: number; month: number; year: number; timestamp: number };
 
-type EventsByDate = Record<string, EventItem[]>; // "YYYY-MM-DD" -> events[]
-
-const STORAGE_KEY = 'my_calendar_events_v1';
-
-const randomId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 type EventItem = {
   id: string;
   title: string;
   allDay: boolean;
   start: string; // ISO
   end: string;   // ISO
-  // optional: location?: string; notes?: string; type?: string;
 };
+type EventsByDate = Record<string, EventItem[]>; // "YYYY-MM-DD" -> events[]
 
+const STORAGE_KEY = 'my_calendar_events_v1';
+const randomId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+// --- ICS Utilities ---
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const formatDateBasic = (d: Date) =>
   `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}`;
@@ -35,11 +48,9 @@ const escapeICS = (s: string) =>
     .replace(/,/g, '\\,')
     .replace(/\r?\n/g, '\\n');
 
-/** Safe flatten of EventsByDate -> EventItem[] */
 function flattenEvents(evMap: EventsByDate): EventItem[] {
   const out: EventItem[] = [];
   if (!evMap || typeof evMap !== 'object') return out;
-
   for (const date of Object.keys(evMap)) {
     const list = Array.isArray(evMap[date]) ? evMap[date] : [];
     for (const ev of list) {
@@ -49,50 +60,31 @@ function flattenEvents(evMap: EventsByDate): EventItem[] {
   return out;
 }
 
-/** Build an .ics file (VCALENDAR) from all events */
 function buildICS(evMap: EventsByDate) {
-  const events = flattenEvents(evMap); // ← no undefined now
-
+  const events = flattenEvents(evMap);
   const lines: string[] = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//YourApp//InAppCalendar//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//YourApp//InAppCalendar//EN',
+    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
   ];
-
-  const now = new Date();
-  const dtstamp = formatDateTimeUTC(now);
+  const dtstamp = formatDateTimeUTC(new Date());
 
   for (const ev of events) {
     const uid = (ev.id || Math.random().toString(36).slice(2)) + '@yourapp.local';
-
-    let dtstart = '';
-    let dtend = '';
+    let dtstart = '', dtend = '';
 
     if (ev.allDay) {
-      // All-day: use VALUE=DATE; DTEND is exclusive
       const s = new Date(ev.start);
       const e = new Date(ev.end);
       dtstart = `DTSTART;VALUE=DATE:${formatDateBasic(s)}`;
       dtend = `DTEND;VALUE=DATE:${formatDateBasic(e)}`;
     } else {
-      // Timed: UTC with Z
       dtstart = `DTSTART:${formatDateTimeUTC(new Date(ev.start))}`;
       dtend = `DTEND:${formatDateTimeUTC(new Date(ev.end))}`;
     }
 
     lines.push(
-      'BEGIN:VEVENT',
-      `UID:${uid}`,
-      `DTSTAMP:${dtstamp}`,
-      dtstart,
-      dtend,
-      `SUMMARY:${escapeICS(ev.title || 'Event')}`,
-      // Optionally:
-      // `LOCATION:${escapeICS(ev.location ?? '')}`,
-      // `DESCRIPTION:${escapeICS(ev.notes ?? '')}`,
-      'END:VEVENT'
+      'BEGIN:VEVENT', `UID:${uid}`, `DTSTAMP:${dtstamp}`, dtstart, dtend,
+      `SUMMARY:${escapeICS(ev.title || 'Event')}`, 'END:VEVENT'
     );
   }
 
@@ -100,13 +92,202 @@ function buildICS(evMap: EventsByDate) {
   return lines.join('\r\n');
 }
 
-export default function App() {
+async function exportICS(evMap: EventsByDate) {
+  try {
+    const ics = buildICS(evMap);
+    const fileUri = FileSystem.Paths.cache + `my-events-${Date.now()}.ics`;
+
+    await FileSystem.writeAsStringAsync(fileUri, ics);
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/calendar',
+        UTI: 'public.calendar-event',
+        dialogTitle: 'Export .ics',
+      });
+    } else {
+      Alert.alert('ICS saved', fileUri);
+    }
+  } catch (e: any) {
+    Alert.alert('Export failed', e?.message ?? String(e));
+  }
+}
+
+// Day View (Hour-by-hour timeline)
+const DayRoute = () => {
+  const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+
+  return (
+    <ScrollView style={styles.dayScroll}>
+      {hours.map((hour) => (
+        <View key={hour} style={styles.hourRow}>
+          <Text style={styles.hourText}>{hour}</Text>
+          <View style={styles.hourDivider} />
+        </View>
+      ))}
+      {/* Example event block */}
+      <View style={[styles.eventBlock, { top: 200, height: 80 }]}>
+        <Text style={styles.eventTitle}>Team Meeting</Text>
+        <Text style={styles.eventTime}>9:00 – 10:00 AM</Text>
+      </View>
+    </ScrollView>
+  );
+};
+
+// Week View in a 7-day horizontal layout
+const WeekRoute = () => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  return (
+    <View style={styles.weekContainer}>
+      {days.map((day) => (
+        <View key={day} style={styles.weekDay}>
+          <Text style={styles.weekDayText}>{day}</Text>
+          <View style={styles.weekEventCard}>
+            <Text style={styles.eventTitle}>Sample Event</Text>
+            <Text style={styles.eventTime}>10 AM</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+// --- MonthRoute ---
+type MonthRouteProps = {
+  selected: string;
+  markedDates: Record<string, any>;
+  setSelected: (date: string) => void;
+  eventsForSelected: EventItem[];
+  removeEvent: (dateKey: string, id: string) => void;
+  addEventLocal: () => void;
+  exportICS: () => void;
+  // Form props
+  title: string; setTitle: (t: string) => void;
+  allDay: boolean; setAllDay: (v: boolean) => void;
+  startHour: string; setStartHour: (t: string) => void;
+  endHour: string; setEndHour: (t: string) => void;
+  multiDay: boolean; setMultiDay: (v: boolean) => void;
+  daysLong: string; setDaysLong: (d: string) => void;
+};
+
+// Month View: contains the Calendar AND the event creation form
+const MonthRoute = (props: MonthRouteProps) => {
   const insets = useSafeAreaInsets();
+  const {
+    selected, markedDates, setSelected, eventsForSelected, removeEvent,
+    addEventLocal, exportICS: handleExportICS, title, setTitle, allDay, setAllDay,
+    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong
+  } = props;
+
+  return (
+    <SafeAreaView style={styles.flex}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.select({ ios: 'padding', android: 'height' })}
+        keyboardVerticalOffset={insets.top + 48} // Adjusted offset to clear TabBar/Safe Area
+      >
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Calendar
+            onDayPress={(d: DayPress) => setSelected(d.dateString)}
+            markedDates={markedDates}
+            markingType="multi-dot"
+            theme={{
+              todayTextColor: '#007AFF',
+              arrowColor: '#007AFF',
+              selectedDayBackgroundColor: 'orange', // Use custom orange from markedDates
+              textMonthFontWeight: 'bold',
+            }}
+          />
+
+          <View style={styles.section}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.h4}>Selected date</Text>
+              <Button title="Export .ics" onPress={handleExportICS} />
+            </View>
+            <Text style={styles.value}>{selected || '—'}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.h4}>Create event (in-app)</Text>
+
+            <Text style={styles.label2}>Title</Text>
+            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Event title" />
+
+            <View style={styles.rowBetween}>
+              <Text style={styles.labelInline}>All-day</Text>
+              <Switch value={allDay} onValueChange={setAllDay} />
+            </View>
+
+            {!allDay && (
+              <>
+                <Text style={styles.label2}>Start (HH:mm)</Text>
+                <TextInput style={styles.input} value={startHour} onChangeText={setStartHour} keyboardType="numbers-and-punctuation" />
+                <Text style={styles.label2}>End (HH:mm)</Text>
+                <TextInput style={styles.input} value={endHour} onChangeText={setEndHour} keyboardType="numbers-and-punctuation" />
+              </>
+            )}
+
+            <View style={styles.rowBetween}>
+              <Text style={styles.labelInline}>Multi-day</Text>
+              <Switch value={multiDay} onValueChange={setMultiDay} />
+            </View>
+
+            {multiDay && (
+              <>
+                <Text style={styles.label2}># of days</Text>
+                <TextInput style={styles.input} value={daysLong} onChangeText={setDaysLong} keyboardType="number-pad" />
+              </>
+            )}
+
+            <Button title="Add to in-app calendar" onPress={addEventLocal} disabled={!selected} />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.h4}>Events on {selected || '—'}</Text>
+            {eventsForSelected.length === 0 ? (
+              <Text style={styles.muted}>No events yet</Text>
+            ) : (
+              eventsForSelected.map(ev => {
+                const start = new Date(ev.start);
+                const end = new Date(ev.end);
+                const timeText = ev.allDay
+                  ? `All-day${start.toDateString() !== end.toDateString() ? ` (${start.toDateString()} → ${end.toDateString()})` : ''}`
+                  : `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+                return (
+                  <View key={ev.id} style={styles.eventCard}>
+                    <Text style={styles.addEventTittle}>• {ev.title}</Text>
+                    <Text style={styles.addEventTime}>{timeText}</Text>
+                    <View style={{ height: 8 }} />
+                    <Button title="Delete" onPress={() => removeEvent(selected, ev.id)} />
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+// ---------- Main Calendar Screen ----------
+export default function CalendarScreen() {
+  const layout = Dimensions.get('window');
+  const [index, setIndex] = useState(2); // start with Month
+  const [routes] = useState([
+    { key: 'day', title: 'Day' },
+    { key: 'week', title: 'Week' },
+    { key: 'month', title: 'Month' },
+  ]);
 
   const [selected, setSelected] = useState('');
   const [events, setEvents] = useState<EventsByDate>({});
 
-  // simple form
+  // simple form state
   const [title, setTitle] = useState('');
   const [allDay, setAllDay] = useState(false);
   const [startHour, setStartHour] = useState('10:00'); // HH:mm local
@@ -130,48 +311,33 @@ export default function App() {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
   }, [events]);
 
-  /*
-  const markedDates = useMemo(
-    () => (selected ? { [selected]: { selected: true, selectedColor: 'orange', disableTouchEvent: true } } : {}),
-    [selected]
-  );*/
-  const dotColor: Record<string, string> = {
-  meeting: '#ff3b30',
-  class:   '#5856d6',
-  todo:    '#34c759',
-  default: '#ff9500',
-};
+  const MAX_DOTS = 3;
 
-const MAX_DOTS = 3; // max dots to show per day
-
-const markedDates = useMemo(() => {
-  const out: Record<string, any> = {};
-
-  for (const [date, list] of Object.entries(events)) {
-    if (!Array.isArray(list) || list.length === 0) continue;
-
-    // One dot per event, each MUST have a unique `key`
+  const markedDates = useMemo(() => {
+    const out: Record<string, any> = {};
     const palette = ['#ff3b30', '#ff9500', '#5856d6', '#34c759', '#00bcd4', '#9c27b0'];
-    const dots = list.slice(0, MAX_DOTS).map((ev, i) => ({
-      key: ev.id ?? `${date}-dot-${i}`,     // unique
-      color: palette[i % palette.length],   // rotate colors (or pick a single color)
-    }));
 
-    // IMPORTANT: put dots under the date entry
-    out[date] = { ...(out[date] || {}), dots };
-  }
+    for (const [date, list] of Object.entries(events)) {
+      if (!Array.isArray(list) || list.length === 0) continue;
 
-  // Merge selection without losing dots
-  if (selected) {
-    out[selected] = {
-      ...(out[selected] || {}),
-      selected: true,
-      selectedColor: 'orange',
-      disableTouchEvent: true,
-    };
-  }
-  return out;
-}, [events, selected]);
+      const dots = list.slice(0, MAX_DOTS).map((ev, i) => ({
+        key: ev.id ?? `${date}-dot-${i}`,
+        color: palette[i % palette.length],
+      }));
+
+      out[date] = { ...(out[date] || {}), dots };
+    }
+
+    if (selected) {
+      out[selected] = {
+        ...(out[selected] || {}),
+        selected: true,
+        selectedColor: 'orange',
+        disableTouchEvent: true,
+      };
+    }
+    return out;
+  }, [events, selected]);
 
   const parseTime = (hhmm: string) => {
     const [h, m] = hhmm.split(':').map(Number);
@@ -190,7 +356,6 @@ const markedDates = useMemo(() => {
 
     if (allDay) {
       const days = multiDay ? Math.max(1, parseInt(daysLong || '1', 10)) : 1;
-      // DTEND for all-day is exclusive; store end as the *day after* the last day
       end = new Date(start);
       end.setDate(start.getDate() + days);
     } else {
@@ -222,144 +387,168 @@ const markedDates = useMemo(() => {
       copy[key] = [...(copy[key] || []), ev];
       return copy;
     });
-
-    // optional: clear title per add
-    // setTitle('New Event');
   }, [selected, allDay, multiDay, daysLong, startHour, endHour, title]);
 
-  const removeEvent = (dateKey: string, id: string) => {
+  const removeEvent = useCallback((dateKey: string, id: string) => {
     setEvents(prev => {
       const list = prev[dateKey] || [];
       return { ...prev, [dateKey]: list.filter(e => e.id !== id) };
     });
-  };
+  }, []);
 
-  async function exportICS(evMap: EventsByDate) {
-  try {
-    const ics = buildICS(evMap);
-    const fileUri = FileSystem.Paths.cache + `my-events-${Date.now()}.ics`;
-
-    // Don’t pass FileSystem.EncodingType.UTF8 (it may be undefined in some SDKs)
-    await FileSystem.writeAsStringAsync(fileUri, ics); // defaults to UTF-8
-
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/calendar',
-        UTI: 'public.calendar-event',
-        dialogTitle: 'Export .ics',
-      });
-    } else {
-      Alert.alert('ICS saved', fileUri);
-    }
-  } catch (e: any) {
-    Alert.alert('Export failed', e?.message ?? String(e));
-  }
-}
+  const handleExportICS = useCallback(() => exportICS(events), [events]);
 
   const eventsForSelected = events[selected] || [];
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.select({ ios: 'padding', android: 'height' })}
-        keyboardVerticalOffset={insets.top}
-      >
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Calendar
-            onDayPress={(d: DayPress) => setSelected(d.dateString)}
+  // Pass all state and handlers to MonthRoute
+  const renderScene = ({ route }: { route: { key: string } }) => {
+    switch (route.key) {
+      case 'day':
+        return <DayRoute />;
+      case 'week':
+        return <WeekRoute />;
+      case 'month':
+        return (
+          <MonthRoute
+            selected={selected}
             markedDates={markedDates}
-            markingType="multi-dot" // enables dots: [] support
+            setSelected={setSelected}
+            eventsForSelected={eventsForSelected}
+            removeEvent={removeEvent}
+            addEventLocal={addEventLocal}
+            exportICS={handleExportICS}
+            title={title} setTitle={setTitle}
+            allDay={allDay} setAllDay={setAllDay}
+            startHour={startHour} setStartHour={setStartHour}
+            endHour={endHour} setEndHour={setEndHour}
+            multiDay={multiDay} setMultiDay={setMultiDay}
+            daysLong={daysLong} setDaysLong={setDaysLong}
           />
+        );
+      default:
+        return null;
+    }
+  };
 
-          <View style={styles.section}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.h4}>Selected date</Text>
-              <Button title="Export .ics" onPress={exportICS} />
-            </View>
-            <Text style={styles.value}>{selected || '—'}</Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.h4}>Create event (in-app)</Text>
-
-            <Text style={styles.label}>Title</Text>
-            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Event title" />
-
-            <View style={styles.rowBetween}>
-              <Text style={styles.labelInline}>All-day</Text>
-              <Switch value={allDay} onValueChange={setAllDay} />
-            </View>
-
-            {!allDay && (
-              <>
-                <Text style={styles.label}>Start (HH:mm)</Text>
-                <TextInput style={styles.input} value={startHour} onChangeText={setStartHour} keyboardType="numbers-and-punctuation" />
-                <Text style={styles.label}>End (HH:mm)</Text>
-                <TextInput style={styles.input} value={endHour} onChangeText={setEndHour} keyboardType="numbers-and-punctuation" />
-              </>
-            )}
-
-            <View style={styles.rowBetween}>
-              <Text style={styles.labelInline}>Multi-day</Text>
-              <Switch value={multiDay} onValueChange={setMultiDay} />
-            </View>
-
-            {multiDay && (
-              <>
-                <Text style={styles.label}># of days</Text>
-                <TextInput style={styles.input} value={daysLong} onChangeText={setDaysLong} keyboardType="number-pad" />
-              </>
-            )}
-
-            <Button title="Add to in-app calendar" onPress={addEventLocal} disabled={!selected} />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.h4}>Events on {selected || '—'}</Text>
-            {eventsForSelected.length === 0 ? (
-              <Text style={styles.muted}>No events yet</Text>
-            ) : (
-              eventsForSelected.map(ev => {
-                const start = new Date(ev.start);
-                const end = new Date(ev.end);
-                const timeText = ev.allDay
-                  ? `All-day${start.toDateString() !== end.toDateString() ? ` (${start.toDateString()} → ${end.toDateString()})` : ''}`
-                  : `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-                return (
-                  <View key={ev.id} style={styles.eventCard}>
-                    <Text style={styles.eventTitle}>• {ev.title}</Text>
-                    <Text style={styles.eventTime}>{timeText}</Text>
-                    <View style={{ height: 8 }} />
-                    <Button title="Delete" onPress={() => removeEvent(selected, ev.id)} />
-                  </View>
-                );
-              })
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+  return (
+    <TabView
+      navigationState={{ index, routes }}
+      renderScene={renderScene}
+      onIndexChange={setIndex}
+      initialLayout={{ width: layout.width }}
+      renderTabBar={(props) => (
+        <SafeAreaView edges={['top']} style={{ backgroundColor: styles.tabBar.backgroundColor }}>
+          <TabBar
+            {...props}
+            style={styles.tabBar}
+            indicatorStyle={styles.indicator}
+            //labelStyle={styles.label}
+          />
+        </SafeAreaView>
+      )}
+    />
   );
 }
 
+// ---------- Styles ----------
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollContent: { padding: 16 },
-  section: { marginTop: 16, gap: 8 },
-  h4: { fontWeight: '700', fontSize: 16 },
-  value: { color: '#333' },
-  label: { fontWeight: '600', marginTop: 6 },
-  labelInline: { fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  muted: { color: '#666' },
-  eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
-  eventTitle: { fontWeight: '600' },
-  eventTime: { color: '#333' },
-});
+    monthContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingTop: 20,
+    },
+    tabBar: {
+      backgroundColor: '#007AFF',
+    },
+    indicator: {
+      backgroundColor: 'white',
+      height: 3,
+    },
+    label: {
+      fontWeight: '600',
+      color: 'white', 
+    },
+    // Day View Styles
+    dayScroll: {
+      flex: 1,
+      backgroundColor: '#ffffffff',
+    },
+    hourRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 60,
+      borderBottomColor: '#E0E0E0',
+      borderBottomWidth: 1,
+    },
+    hourText: {
+      width: 50,
+      textAlign: 'right',
+      marginRight: 10,
+      color: '#555',
+    },
+    hourDivider: {
+      flex: 1,
+      borderBottomWidth: 0.5,
+      borderBottomColor: '#E0E0E0',
+    },
+    eventBlock: {
+      position: 'absolute',
+      left: 70,
+      right: 20,
+      backgroundColor: '#007AFF33',
+      borderLeftColor: '#007AFF',
+      borderLeftWidth: 3,
+      borderRadius: 8,
+      padding: 8,
+    },
+    eventTitle: {
+      fontWeight: '600',
+      color: '#007AFF',
+    },
+    eventTime: {
+      color: '#333',
+      fontSize: 12,
+    },
+    // Week View Styles
+    weekContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingVertical: 20,
+      backgroundColor: '#FFF',
+      flex: 1,
+    },
+    weekDay: {
+      alignItems: 'center',
+      flex: 1,
+    },
+    weekDayText: {
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    weekEventCard: {
+      backgroundColor: '#007AFF33',
+      borderRadius: 8,
+      padding: 8,
+      width: 70,
+      alignItems: 'center',
+    },
+    // Add Event Styles
+      flex: { 
+        flex: 1,
+        backgroundColor: '#fff' 
+      },
+      container: { flex: 1, backgroundColor: '#fff' },
+      scrollContent: { padding: 16 },
+      section: { marginTop: 16, gap: 8 },
+      h4: { fontWeight: '700', fontSize: 16 },
+      value: { color: '#333' },
+      label2: { fontWeight: '600', marginTop: 6 },
+      labelInline: { fontWeight: '600' },
+      input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
+      rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+      muted: { color: '#666' },
+      eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
+      addEventTittle: { fontWeight: '600' },
+      addEventTime: { color: '#333' },
+  });
+
