@@ -53,7 +53,7 @@ const WeekRoute = () => {
 const MonthRoute = () => {
   const [selected, setSelected] = useState('');
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.monthContainer}>
       <Calendar
         onDayPress={(day) => setSelected(day.dateString)}
         markedDates={{
@@ -108,7 +108,7 @@ export default function CalendarScreen() {
 
 // ---------- Styles ----------
 const styles = StyleSheet.create({
-  container: {
+  monthContainer: {
     flex: 1,
     justifyContent: 'center',
     paddingTop: 20,
