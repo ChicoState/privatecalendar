@@ -14,8 +14,8 @@ First, build the container
 
 Then run for web
 
-```docker run -it --rm -p 8081:8081 private-calendar:latest --web```
+```docker run -it --rm -p 8081:8081 -v "$(pwd):/app" private-calendar:latest --web```
 
 Or for andriod mobile phone
 
-```docker run -it --rm -p 19000:19000 -p 19001:19001 private-calendar:latest --tunnel```
+'''docker run -it --rm -p 19000:19000 -p 19001:19001 -v "$(pwd):/app" private-calendar:latest --tunnel'''
