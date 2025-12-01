@@ -10,6 +10,7 @@ A simple open source project for a Software Enginneering class with the idea of 
 ## Docker setup & running
 
 First, build the container
+
 ```docker buildx build -t private-calendar .```
 
 Then run for web
@@ -18,4 +19,4 @@ Then run for web
 
 Or for andriod mobile phone
 
-'''docker run -it --rm -p 19000:19000 -p 19001:19001 -v "$(pwd):/app" private-calendar:latest --tunnel'''
+```docker run -it --rm -p 19000:19000 -p 19001:19001 -v "$(pwd):/app" private-calendar:latest --tunnel```
