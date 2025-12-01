@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+
 import { StyleSheet, Text, View, Button, TextInput, Switch, Platform, KeyboardAvoidingView, ScrollView, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
@@ -182,9 +183,29 @@ const markedDates = useMemo(() => {
     return new Date(y, (mo ?? 1) - 1, d ?? 1, h, m, 0, 0);
   };
 
+
+
+  
+  const [bannerVisible, setBannerVisible] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState('');
+  const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showBanner = (message: string) => {
+  setBannerMessage(message);
+  setBannerVisible(true);
+
+  if (bannerTimeoutRef.current) {
+    clearTimeout(bannerTimeoutRef.current);
+  }
+
+  bannerTimeoutRef.current = setTimeout(() => {
+    setBannerVisible(false);
+  }, 2000);
+};
+
   const addEventLocal = useCallback(() => {
     if (!selected) return;
 
+    showBanner('Event added to in-app calendar');
     let start = toLocalDate(selected);
     let end = toLocalDate(selected);
 
@@ -265,6 +286,11 @@ const markedDates = useMemo(() => {
         behavior={Platform.select({ ios: 'padding', android: 'height' })}
         keyboardVerticalOffset={insets.top}
       >
+        {bannerVisible && (
+          <View style={[styles.banner, { top: insets.top + 8 }]}>
+            <Text style={styles.bannerText}>{bannerMessage}</Text>
+          </View>
+        )}
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
@@ -362,4 +388,28 @@ const styles = StyleSheet.create({
   eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
   eventTitle: { fontWeight: '600' },
   eventTime: { color: '#333' },
+  content: {
+    padding: 16,
+  },
+  banner: {
+    position: 'absolute',
+    top: 10,
+    left: 16,
+    right: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#4CAF50', // success green
+    borderRadius: 8,
+    zIndex: 1000,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  bannerText: {
+    color: 'white',
+    fontWeight: '600',
+  },
 });
