@@ -17,26 +17,14 @@ export default class Event {
     private attendees?: string[]; //list of attendees.
     private creator!: string; //name of event creator.
 
-    defconstructor(){
-        this.uid = `${Date.now()}`;
-        this.DTStamp = new Date(); //set current timestamp on creation
-        this.DTstart = "TZID=America/New_York:20130802T103400";
-        this.DTend = "TZID=America/New_York:20130802T110400";
-        this.summary = "Event Name";
-        this.creator = "Sam";
-        this.description = "This is a test description";
-        this.location = "Somewhere";
-        this.status = "TENTATIVE";
-        this.rRule = "";
-        this.attendees = ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
-    }
+    
 
     constructor(
-        id: string,  
-        Start: string, 
-        End: string, 
-        Sum: string,    
-        founder: string,
+        id?: string,  
+        Start?: string, 
+        End?: string, 
+        Sum?: string,    
+        founder?: string,
         desc?: string,
         loc?: string,
         stat?:"CONFIRMED" | "CANCELLED" | "TENTATIVE",
@@ -45,21 +33,22 @@ export default class Event {
         )
     {
         //required values
-        //Creates a random UID for the event, current date + random number
+        //Note that if an input is not entered, it will default to the values right of the ??
+        
         this.uid = `${Date.now()}`;
         this.DTStamp = new Date(); //set current timestamp on creation
-        this.DTstart = Start;
-        this.DTend = End;
-        this.summary = Sum;
-        this.creator = founder;
+        this.DTstart = Start ?? "TZID=America/New_York:20130802T103400";
+        this.DTend = End ?? "TZID=America/New_York:20130802T110400";
+        this.summary = Sum ?? "Event Name";
+        this.creator = founder ?? "Sam";
 
         // optional values
 
-        this.description = desc;
-        this.location = loc;
-        this.status = stat;
-        this.rRule = recur;
-        this.attendees = participantList;
+        this.description = desc ?? "This is a test description";
+        this.location = loc ?? "Somewhere";
+        this.status = stat ?? "TENTATIVE";
+        this.rRule = recur ?? "";
+        this.attendees = participantList ?? ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
     }
 
     /* Getters */
