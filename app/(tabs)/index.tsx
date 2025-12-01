@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 
-import { StyleSheet, Text, View, Button, TextInput, Switch, Platform, KeyboardAvoidingView, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, View, Button, TextInput, Switch, Platform, KeyboardAvoidingView, ScrollView, Alert, Animated } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -186,20 +186,34 @@ const markedDates = useMemo(() => {
 
 
   
-  const [bannerVisible, setBannerVisible] = useState(false);
-  const [bannerMessage, setBannerMessage] = useState('');
+  const [bannerVisible, setBannerVisible] = useState<boolean>(false);
+  const [bannerMessage, setBannerMessage] = useState<string>('');
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+
   const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showBanner = (message: string) => {
   setBannerMessage(message);
   setBannerVisible(true);
 
-  if (bannerTimeoutRef.current) {
-    clearTimeout(bannerTimeoutRef.current);
-  }
+  fadeAnim.setValue(0);
 
-  bannerTimeoutRef.current = setTimeout(() => {
+  Animated.sequence([
+    Animated.timing(fadeAnim, {
+      toValue: 1,           // fade in
+      duration: 200,
+      useNativeDriver: true,
+    }),
+    Animated.delay(1500),   // stay visible for 1.5s
+    Animated.timing(fadeAnim, {
+      toValue: 0,           // fade out
+      duration: 200,
+      useNativeDriver: true,
+    }),
+  ]).start(() => {
     setBannerVisible(false);
-  }, 2000);
+  });
 };
 
   const addEventLocal = useCallback(() => {
@@ -287,9 +301,24 @@ const markedDates = useMemo(() => {
         keyboardVerticalOffset={insets.top}
       >
         {bannerVisible && (
-          <View style={[styles.banner, { top: insets.top + 8 }]}>
+          <Animated.View
+            style={[
+              styles.banner,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  {
+                    translateY: fadeAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-10, 0], // small slide-down while fading in
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <Text style={styles.bannerText}>{bannerMessage}</Text>
-          </View>
+          </Animated.View>
         )}
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
