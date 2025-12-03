@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
       width: 50,
       textAlign: 'right',
       marginRight: 10,
-      color: '#555',
+      color: '#000',
     },
     // Week View Styles
     weekContainer: {
