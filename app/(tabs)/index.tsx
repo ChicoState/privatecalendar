@@ -232,7 +232,7 @@ const MonthRoute = (props: MonthRouteProps) => {
               selectedValue={category}
               onValueChange={(value) => setCategory(value)}
               style={{
-					  backgroundColor: '#f0f0f0', //light gray
+					  backgroundColor: '#A9A9A9', //light gray
 					  color: 'black',
 				  }}
             >
@@ -585,6 +585,6 @@ const styles = StyleSheet.create({
       eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
       addEventTittle: { fontWeight: '600' },
       addEventTime: { color: '#333' },
-	  addEventCategory: { color: '#626', marginTop: 4 },
+	  addEventCategory: { color: '#000', marginTop: 4 },
   });
 
