@@ -101,8 +101,56 @@ function buildICS(evMap: EventsByDate) {
   return lines.join('\r\n');
 }
 
+
+
+
+
 export default function App() {
   const insets = useSafeAreaInsets();
+
+  const BANNER_DURATION = 1500; // visible time in ms
+
+  // inside your component:
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const nextIdRef = useRef(0);
+  
+
+type Notification = {
+    id: number;
+    message: string;
+    anim: Animated.Value;
+  };
+
+const showNotification = (message: string) => {
+  
+  const id = nextIdRef.current++; // incremental ID for the notification
+  const anim = new Animated.Value(0);
+
+  const newNotification: Notification = { id, message, anim };
+
+  //console.log('Showing notification:', message);
+  // Add to list
+  setNotifications(prev => [...prev, newNotification]);
+  
+  // Animate: fade in -> delay -> fade out
+  Animated.sequence([
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }),
+    Animated.delay(BANNER_DURATION),
+    Animated.timing(anim, {
+      toValue: 0,
+      duration: 2200,
+      useNativeDriver: true,
+    }),
+  ]).start(() => {
+    // Remove when finished
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    //console.log('removing notification:', id);
+  });
+};
 
   const [selected, setSelected] = useState('');
   const [events, setEvents] = useState<EventsByDate>({});
@@ -219,7 +267,7 @@ const markedDates = useMemo(() => {
   const addEventLocal = useCallback(() => {
     if (!selected) return;
 
-    showBanner('Event added to in-app calendar');
+    //showBanner('Event added to in-app calendar');
     let start = toLocalDate(selected);
     let end = toLocalDate(selected);
 
@@ -262,6 +310,10 @@ const markedDates = useMemo(() => {
     // setTitle('New Event');
   }, [selected, allDay, multiDay, daysLong, startHour, endHour, title]);
 
+  const handleAddEventLocal = () => {
+    addEventLocal();
+    showNotification('Event added to in-app calendar');
+  };
   const removeEvent = (dateKey: string, id: string) => {
     setEvents(prev => {
       const list = prev[dateKey] || [];
@@ -300,7 +352,39 @@ const markedDates = useMemo(() => {
         behavior={Platform.select({ ios: 'padding', android: 'height' })}
         keyboardVerticalOffset={insets.top}
       >
-        {bannerVisible && (
+        {notifications.length > 0 && (
+      <View
+        style={[
+          styles.notificationsContainer,
+          { top: insets.top + 8 }, // respect notch
+        ]}
+        pointerEvents="none" // touches pass through
+      >
+        {notifications.map((n) => (
+          <Animated.View
+            key={n.id}
+            style={[
+              styles.banner,
+              {
+                opacity: n.anim,
+                transform: [
+                  {
+                    translateY: n.anim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-10, 0], // small slide-in
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.bannerText}>{n.message}</Text>
+          </Animated.View>
+        ))}
+      </View>
+    )}
+        
+        {/*bannerVisible && (
           <Animated.View
             style={[
               styles.banner,
@@ -319,7 +403,8 @@ const markedDates = useMemo(() => {
           >
             <Text style={styles.bannerText}>{bannerMessage}</Text>
           </Animated.View>
-        )}
+        )*/}
+        
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
@@ -370,7 +455,7 @@ const markedDates = useMemo(() => {
               </>
             )}
 
-            <Button title="Add to in-app calendar" onPress={addEventLocal} disabled={!selected} />
+            <Button title="Add to in-app calendar" onPress={handleAddEventLocal} disabled={!selected} />
           </View>
 
           <View style={styles.section}>
@@ -440,5 +525,12 @@ const styles = StyleSheet.create({
   bannerText: {
     color: 'white',
     fontWeight: '600',
+  },
+  notificationsContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    // top is set dynamically with insets
+    zIndex: 1000,
   },
 });
