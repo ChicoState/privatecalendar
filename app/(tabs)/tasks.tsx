@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Event from "../utils/eventFramework";
 import {
   View,
@@ -13,7 +13,9 @@ import {
   ScrollView,
   Touchable, 
 } from "react-native";
-import { MaterialCommunityIcons } from '@expo/vector-icons'; 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { TimepickerUI } from "timepicker-ui"
+import type { OptionTypes } from 'timepicker-ui';
 
 // Define an interface to manage the full set of Event properties in state
 interface TaskEventData {
