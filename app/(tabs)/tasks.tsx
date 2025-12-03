@@ -17,6 +17,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Define an interface to manage the full set of Event properties in state
 interface TaskEventData {
+<<<<<<< HEAD
+=======
+    type: "VEVENT" | "VTODO"
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     id: string;
     summary: string;
     DTstart: string;
@@ -25,12 +29,21 @@ interface TaskEventData {
     description: string;
     location: string;
     status: "CONFIRMED" | "CANCELLED" | "TENTATIVE";
+<<<<<<< HEAD
+=======
+    statusToDo: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED";
+    priority: number
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     rRule: string;
     attendees: string;
 }
 
 // Default values for a new task/event
 const DEFAULT_TASK_DATA: TaskEventData = {
+<<<<<<< HEAD
+=======
+    type: "VTODO",
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     id: "", 
     summary: "",
     DTstart: "20251108T100000",
@@ -39,12 +52,28 @@ const DEFAULT_TASK_DATA: TaskEventData = {
     description: "",
     location: "",
     status: "TENTATIVE",
+<<<<<<< HEAD
+=======
+    statusToDo: "NEEDS-ACTION",
+    priority: 0,
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     rRule: "",
     attendees: "", 
 };
 
 // Define the available status options
+<<<<<<< HEAD
 const STATUS_OPTIONS: TaskEventData['status'][] = ["TENTATIVE", "CONFIRMED", "CANCELLED"];
+=======
+const STATUS_OPTIONS: TaskEventData['statusToDo'][] = ["NEEDS-ACTION", "COMPLETED", "IN-PROCESS", "CANCELLED"];
+
+const PRIORITY_OPTIONS = [
+    { label: "No Preference", value: 0},
+    { label: 'High', value: 1 },
+    { label: 'Medium', value: 5 },
+    { label: 'Low', value: 9 },
+];
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
 
 // Task Page
 const App: React.FC = () => {
@@ -54,9 +83,16 @@ const App: React.FC = () => {
     const [modalVisible, setModalVisible] = useState<boolean>(false);
     const [advancedOptionsVisible, setAdvancedOptionsVisible] = useState<boolean>(false); 
     const [statusDropdownVisible, setStatusDropdownVisible] = useState<boolean>(false);
+<<<<<<< HEAD
 
     // Helper to update a specific field in the current taskData state
     const handleChange = (field: keyof TaskEventData, value: string) => {
+=======
+    const [priorityDropdownVisible, setPriorityDropdownVisible] = useState<boolean>(false);
+
+    // Helper to update a specific field in the current taskData state
+    const handleChange = (field: keyof TaskEventData, value: string | number) => {
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
         if (field === "status") {
             setTaskData(prev => ({ ...prev, [field]: value as TaskEventData['status'] }));
         } else {
@@ -70,6 +106,10 @@ const App: React.FC = () => {
         setEditIndex(-1);
         setAdvancedOptionsVisible(false); // Reset dropdown when opening for new task
         setStatusDropdownVisible(false); 
+<<<<<<< HEAD
+=======
+        setPriorityDropdownVisible(false);
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
         setModalVisible(true);
     };
 
@@ -78,6 +118,10 @@ const App: React.FC = () => {
         const taskToEdit = tasks[index]; 
         
         setTaskData({
+<<<<<<< HEAD
+=======
+            type: (taskToEdit.getType() || "VTODO") as TaskEventData['type'],
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
             id: taskToEdit.getUid(),
             summary: taskToEdit.getSummary(),
             DTstart: taskToEdit.getDTstart(),
@@ -86,6 +130,11 @@ const App: React.FC = () => {
             description: taskToEdit.getDescription() || "",
             location: taskToEdit.getLocation() || "",
             status: (taskToEdit.getStatus() || "TENTATIVE") as TaskEventData['status'],
+<<<<<<< HEAD
+=======
+            statusToDo: (taskToEdit.getstatusToDo() || "NEEDS-ACTION") as TaskEventData['statusToDo'],
+            priority: (taskToEdit.getPriority()),
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
             rRule: taskToEdit.getRRule() || "",
             attendees: taskToEdit.getAttendees() ? taskToEdit.getAttendees()!.join(", ") : "",
         });
@@ -93,6 +142,7 @@ const App: React.FC = () => {
         setEditIndex(index);
         setAdvancedOptionsVisible(false); // Reset dropdown when opening for editing
         setStatusDropdownVisible(false); 
+<<<<<<< HEAD
         setModalVisible(true);
     };
     
@@ -101,6 +151,23 @@ const App: React.FC = () => {
         handleChange('status', status);
         setStatusDropdownVisible(false); // Close the dropdown
     };
+=======
+        setPriorityDropdownVisible(false);
+        setModalVisible(true);
+    };
+    
+    // Function to select an option from the custom status dropdown
+    const handleSelectStatus = (status: TaskEventData['statusToDo']) => {
+        handleChange('statusToDo', status);
+        setStatusDropdownVisible(false); // Close the dropdown
+    };
+
+    // Function to select an option from the custom priority dropdown
+    const handleSelectPriority = (priority: number) => {
+        handleChange('priority', priority);
+        setPriorityDropdownVisible(false); // Close the dropdown
+    };
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
 
     // Save Task
     const handleSaveTask = () => {
@@ -121,7 +188,12 @@ const App: React.FC = () => {
             existingTask.setDTstart(taskData.DTstart);
             existingTask.setDTend(taskData.DTend);
             existingTask.setCreator(taskData.creator);
+<<<<<<< HEAD
             existingTask.setStatus(taskData.status);
+=======
+            existingTask.setstatusToDo(taskData.statusToDo);
+            existingTask.setPriority(taskData.priority);
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
             existingTask.setRRule(taskData.rRule || undefined);
             existingTask.setAttendees(participantList.length > 0 ? participantList : undefined);
 
@@ -129,6 +201,10 @@ const App: React.FC = () => {
 
         } else {
             const newEvent = new Event(
+<<<<<<< HEAD
+=======
+                taskData.type,
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
                 taskData.id,
                 taskData.DTstart,
                 taskData.DTend,
@@ -137,6 +213,11 @@ const App: React.FC = () => {
                 taskData.description || undefined,
                 taskData.location || undefined,
                 taskData.status,
+<<<<<<< HEAD
+=======
+                taskData.statusToDo,
+                taskData.priority,
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
                 taskData.rRule || undefined,
                 participantList.length > 0 ? participantList : undefined
             );
@@ -312,12 +393,35 @@ const App: React.FC = () => {
                                     onChangeText={(text) => handleChange("attendees", text)}
                                 />
 
+<<<<<<< HEAD
                                 <Text style={styles.inputLabel}>Status (Note: change this to task, not event status)</Text>
+=======
+                                <Text style={styles.inputLabel}>Status</Text>
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
                                 <TouchableOpacity 
                                     style={styles.customDropdownButton}
                                     onPress={() => setStatusDropdownVisible(true)}
                                 >
+<<<<<<< HEAD
                                     <Text style={styles.customDropdownText}>{taskData.status}</Text>
+=======
+                                    <Text style={styles.customDropdownText}>{taskData.statusToDo}</Text>
+                                    <MaterialCommunityIcons 
+                                        name="chevron-down" 
+                                        size={24} 
+                                        color="#ccc" 
+                                    />
+                                </TouchableOpacity>
+
+                                <Text style={styles.inputLabel}>Priority</Text>
+                                <TouchableOpacity 
+                                    style={styles.customDropdownButton}
+                                    onPress={() => setPriorityDropdownVisible(true)}
+                                >
+                                    <Text style={styles.customDropdownText}>
+                                        {PRIORITY_OPTIONS.find(p => p.value === taskData.priority)?.label || 'No Preference'}
+                                    </Text>
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
                                     <MaterialCommunityIcons 
                                         name="chevron-down" 
                                         size={24} 
@@ -376,6 +480,7 @@ const App: React.FC = () => {
             <TouchableWithoutFeedback onPress={() => setStatusDropdownVisible(false)}>
                 <View style={styles.dropdownOverlay}>
                     <View style={styles.dropdownContainer}>
+<<<<<<< HEAD
                         {STATUS_OPTIONS.map((status) => (
                             <TouchableOpacity
                                 key={status}
@@ -383,6 +488,41 @@ const App: React.FC = () => {
                                 onPress={() => handleSelectStatus(status)}
                             >
                                 <Text style={styles.dropdownItemText}>{status}</Text>
+=======
+                        {STATUS_OPTIONS.map((statusToDo) => (
+                            <TouchableOpacity
+                                key={statusToDo}
+                                style={styles.dropdownItem}
+                                onPress={() => handleSelectStatus(statusToDo)}
+                            >
+                                <Text style={styles.dropdownItemText}>{statusToDo}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </TouchableWithoutFeedback>
+        </Modal>
+
+        {/* Custom Priority Dropdown Modal */}
+        <Modal
+            animationType="fade"
+            transparent
+            visible={priorityDropdownVisible}
+            onRequestClose={() => setPriorityDropdownVisible(false)}
+        >
+            <TouchableWithoutFeedback onPress={() => setPriorityDropdownVisible(false)}>
+                <View style={styles.dropdownOverlay}>
+                    <View style={styles.dropdownContainer}>
+                        {PRIORITY_OPTIONS.map((priority) => (
+                            <TouchableOpacity
+                                key={priority.value}
+                                style={styles.dropdownItem}
+                                onPress={() => handleSelectPriority(priority.value)}
+                            >
+                                <Text style={styles.dropdownItemText}>
+                                    {priority.label} ({priority.value})
+                                </Text>
+>>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
                             </TouchableOpacity>
                         ))}
                     </View>
