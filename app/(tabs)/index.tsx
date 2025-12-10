@@ -35,6 +35,7 @@ type EventItem = {
 type EventsByDate = Record<string, EventItem[]>; // "YYYY-MM-DD" -> events[]
 
 const STORAGE_KEY = 'my_calendar_events_v1';
+const CATEGORY_STORAGE_KEY = 'my_calendar_categories_v1'
 const randomId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 // --- ICS Utilities ---
@@ -172,6 +173,11 @@ type MonthRouteProps = {
   multiDay: boolean; setMultiDay: (v: boolean) => void;
   daysLong: string; setDaysLong: (d: string) => void;
   category: string; setCategory: (c: string) => void;
+
+  categories: string[];
+  newCategory: string;
+  setNewCategory: (c: string) => void;
+  addCategory: () => void;
 };
 
 // Month View: contains the Calendar AND the event creation form
@@ -180,7 +186,7 @@ const MonthRoute = (props: MonthRouteProps) => {
   const {
     selected, markedDates, setSelected, eventsForSelected, removeEvent,
     addEventLocal, exportICS: handleExportICS, title, setTitle, allDay, setAllDay,
-    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong, category, setCategory
+    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong, category, setCategory, categories, newCategory, setNewCategory, addCategory,
   } = props;
 
   return (
@@ -236,11 +242,22 @@ const MonthRoute = (props: MonthRouteProps) => {
 					  color: 'black',
 				  }}
             >
-              <Picker.Item label="General" value="general" />
-              <Picker.Item label="Work" value="work" />
-              <Picker.Item label="Personal" value="personal" />
-              <Picker.Item label="School" value="school" />
+			{categories.map((cat) => (
+    			<Picker.Item
+      			key={cat}
+      			label={cat.charAt(0).toUpperCase() + cat.slice(1)}
+			    value={cat}
+    				/>
+  			))}
             </Picker>
+			<Text style={styles.label2}>Add new category</Text>
+			<TextInput
+  			style={styles.input}
+  			placeholder="Enter new category"
+  			value={newCategory}
+  			onChangeText={setNewCategory}
+			/>
+			<Button title="Add Category" onPress={addCategory} />
 
             {!allDay && (
               <>
@@ -322,6 +339,15 @@ export default function CalendarScreen() {
   const [daysLong, setDaysLong] = useState('2');
   const [category, setCategory] = useState<string>('personal');
 
+const [categories, setCategories] = useState<string[]>([
+  'general',
+  'work',
+  'personal',
+  'school',
+]);
+const [newCategory, setNewCategory] = useState('');
+
+
   // load & persist
   useEffect(() => {
     (async () => {
@@ -337,6 +363,43 @@ export default function CalendarScreen() {
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
   }, [events]);
+
+  useEffect(() => {
+  (async () => {
+    try {
+      const raw = await AsyncStorage.getItem(CATEGORY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCategories(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load categories', e);
+    }
+  })();
+}, []);
+
+  useEffect(() => {
+  AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => {});
+}, [categories]);
+
+  const addCategory = useCallback(() => {
+  const trimmed = newCategory.trim();
+  if (!trimmed) return;
+
+  const key = trimmed.toLowerCase();
+
+  setCategories((prev) => {
+    if (prev.includes(key)) return prev;
+    return [...prev, key];
+  });
+
+  setCategory(key);
+  setNewCategory('');
+}, [newCategory, setCategory, setCategories, setNewCategory]);
+
+
 
   const MAX_DOTS = 3;
 
@@ -452,6 +515,10 @@ export default function CalendarScreen() {
             multiDay={multiDay} setMultiDay={setMultiDay}
             daysLong={daysLong} setDaysLong={setDaysLong}
 			category={category} setCategory={setCategory}
+			categories={categories}
+      		newCategory={newCategory}
+      		setNewCategory={setNewCategory}
+      		addCategory={addCategory}
           />
         );
       default:
