@@ -357,7 +357,7 @@ export default function App() {
   const [selected, setSelected] = useState('');
   const [events, setEvents] = useState<EventsByDate>({});
 
-  const [title, setTitle] = useState('New Event');
+  const [title, setTitle] = useState('');
   const [allDay, setAllDay] = useState(false);
   const [startHour, setStartHour] = useState('10:00');
   const [endHour, setEndHour] = useState('11:00');
