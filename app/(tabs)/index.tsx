@@ -312,7 +312,7 @@ const markedDates = useMemo(() => {
 
   const handleAddEventLocal = () => {
     addEventLocal();
-    showNotification('Event added to in-app calendar');
+    showNotification(`Added event: ${title}`);
   };
   const removeEvent = (dateKey: string, id: string) => {
     setEvents(prev => {
