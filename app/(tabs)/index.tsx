@@ -356,6 +356,38 @@ const markedDates = useMemo(() => {
       <View
         style={[
           styles.notificationsContainer,
+          { top: insets.top + 8 },
+        ]}
+        pointerEvents="none"
+      >
+        {[...notifications].reverse().map(n => (
+          <Animated.View
+            key={n.id}
+            style={[
+              styles.banner,
+              {
+                opacity: n.anim,
+                // optional small slide; safe because each item takes its own row
+                transform: [
+                  {
+                    translateY: n.anim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-6, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.bannerText}>{n.message}</Text>
+          </Animated.View>
+        ))}
+      </View>
+    )}
+        {/*notifications.length > 0 && (
+      <View
+        style={[
+          styles.notificationsContainer,
           { top: insets.top + 8 }, // respect notch
         ]}
         pointerEvents="none" // touches pass through
@@ -382,7 +414,7 @@ const markedDates = useMemo(() => {
           </Animated.View>
         ))}
       </View>
-    )}
+    )*/}
         
         {/*bannerVisible && (
           <Animated.View
@@ -506,16 +538,13 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   banner: {
-    position: 'absolute',
-    top: 10,
-    left: 16,
-    right: 16,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: '#4CAF50', // success green
+    backgroundColor: '#4CAF50',
     borderRadius: 8,
-    zIndex: 1000,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 2 },
@@ -530,7 +559,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    // top is set dynamically with insets
     zIndex: 1000,
+    flexDirection: 'column',
   },
 });
