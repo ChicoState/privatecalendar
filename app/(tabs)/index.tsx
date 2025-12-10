@@ -19,6 +19,7 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as SQLite from 'expo-sqlite';
+import { Picker } from '@react-native-picker/picker';
 
 // --- Types ---
 type DayPress = { dateString: string; day: number; month: number; year: number; timestamp: number };
@@ -29,10 +30,12 @@ type EventItem = {
   allDay: boolean;
   start: string; // ISO
   end: string;   // ISO
+  category?: string;
 };
 type EventsByDate = Record<string, EventItem[]>; // "YYYY-MM-DD" -> events[]
 
 const STORAGE_KEY = 'my_calendar_events_v1';
+const CATEGORY_STORAGE_KEY = 'my_calendar_categories_v1'
 const randomId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 // --- ICS Utilities ---
@@ -169,6 +172,12 @@ type MonthRouteProps = {
   endHour: string; setEndHour: (t: string) => void;
   multiDay: boolean; setMultiDay: (v: boolean) => void;
   daysLong: string; setDaysLong: (d: string) => void;
+  category: string; setCategory: (c: string) => void;
+
+  categories: string[];
+  newCategory: string;
+  setNewCategory: (c: string) => void;
+  addCategory: () => void;
 };
 
 // Month View: contains the Calendar AND the event creation form
@@ -177,7 +186,7 @@ const MonthRoute = (props: MonthRouteProps) => {
   const {
     selected, markedDates, setSelected, eventsForSelected, removeEvent,
     addEventLocal, exportICS: handleExportICS, title, setTitle, allDay, setAllDay,
-    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong
+    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong, category, setCategory, categories, newCategory, setNewCategory, addCategory,
   } = props;
 
   return (
@@ -220,7 +229,35 @@ const MonthRoute = (props: MonthRouteProps) => {
             <View style={styles.rowBetween}>
               <Text style={styles.labelInline}>All-day</Text>
               <Switch value={allDay} onValueChange={setAllDay} />
+
             </View>
+
+
+			<Text style={styles.h4}>Category</Text>
+			<Picker
+              selectedValue={category}
+              onValueChange={(value) => setCategory(value)}
+              style={{
+					  backgroundColor: '#A9A9A9', //light gray
+					  color: 'black',
+				  }}
+            >
+			{categories.map((cat) => (
+    			<Picker.Item
+      			key={cat}
+      			label={cat.charAt(0).toUpperCase() + cat.slice(1)}
+			    value={cat}
+    				/>
+  			))}
+            </Picker>
+			<Text style={styles.label2}>Add new category</Text>
+			<TextInput
+  			style={styles.input}
+  			placeholder="Enter new category"
+  			value={newCategory}
+  			onChangeText={setNewCategory}
+			/>
+			<Button title="Add Category" onPress={addCategory} />
 
             {!allDay && (
               <>
@@ -231,10 +268,12 @@ const MonthRoute = (props: MonthRouteProps) => {
               </>
             )}
 
+
             <View style={styles.rowBetween}>
               <Text style={styles.labelInline}>Multi-day</Text>
               <Switch value={multiDay} onValueChange={setMultiDay} />
             </View>
+
 
             {multiDay && (
               <>
@@ -262,6 +301,9 @@ const MonthRoute = (props: MonthRouteProps) => {
                   <View key={ev.id} style={styles.eventCard}>
                     <Text style={styles.addEventTittle}>• {ev.title}</Text>
                     <Text style={styles.addEventTime}>{timeText}</Text>
+					{ev.category && (
+						<Text style={styles.addEventCategory}>Category: {ev.category}</Text>
+						)}
                     <View style={{ height: 8 }} />
                     <Button title="Delete" onPress={() => removeEvent(selected, ev.id)} />
                   </View>
@@ -295,6 +337,16 @@ export default function CalendarScreen() {
   const [endHour, setEndHour] = useState('11:00');
   const [multiDay, setMultiDay] = useState(false);
   const [daysLong, setDaysLong] = useState('2');
+  const [category, setCategory] = useState<string>('personal');
+
+const [categories, setCategories] = useState<string[]>([
+  'general',
+  'work',
+  'personal',
+  'school',
+]);
+const [newCategory, setNewCategory] = useState('');
+
 
   // load & persist
   useEffect(() => {
@@ -311,6 +363,43 @@ export default function CalendarScreen() {
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
   }, [events]);
+
+  useEffect(() => {
+  (async () => {
+    try {
+      const raw = await AsyncStorage.getItem(CATEGORY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCategories(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load categories', e);
+    }
+  })();
+}, []);
+
+  useEffect(() => {
+  AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => {});
+}, [categories]);
+
+  const addCategory = useCallback(() => {
+  const trimmed = newCategory.trim();
+  if (!trimmed) return;
+
+  const key = trimmed.toLowerCase();
+
+  setCategories((prev) => {
+    if (prev.includes(key)) return prev;
+    return [...prev, key];
+  });
+
+  setCategory(key);
+  setNewCategory('');
+}, [newCategory, setCategory, setCategories, setNewCategory]);
+
+
 
   const MAX_DOTS = 3;
 
@@ -380,6 +469,7 @@ export default function CalendarScreen() {
       allDay,
       start: start.toISOString(),
       end: end.toISOString(),
+	  category,
     };
 
     setEvents(prev => {
@@ -388,7 +478,7 @@ export default function CalendarScreen() {
       copy[key] = [...(copy[key] || []), ev];
       return copy;
     });
-  }, [selected, allDay, multiDay, daysLong, startHour, endHour, title]);
+  }, [selected, allDay, multiDay, daysLong, startHour, endHour, title, category]);
 
   const removeEvent = useCallback((dateKey: string, id: string) => {
     setEvents(prev => {
@@ -424,6 +514,11 @@ export default function CalendarScreen() {
             endHour={endHour} setEndHour={setEndHour}
             multiDay={multiDay} setMultiDay={setMultiDay}
             daysLong={daysLong} setDaysLong={setDaysLong}
+			category={category} setCategory={setCategory}
+			categories={categories}
+      		newCategory={newCategory}
+      		setNewCategory={setNewCategory}
+      		addCategory={addCategory}
           />
         );
       default:
@@ -510,6 +605,12 @@ const styles = StyleSheet.create({
       color: '#333',
       fontSize: 12,
     },
+    categoryText: {
+      width: 50,
+      textAlign: 'right',
+      marginRight: 10,
+      color: '#000',
+    },
     // Week View Styles
     weekContainer: {
       flexDirection: 'row',
@@ -551,5 +652,6 @@ const styles = StyleSheet.create({
       eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
       addEventTittle: { fontWeight: '600' },
       addEventTime: { color: '#333' },
+	  addEventCategory: { color: '#000', marginTop: 4 },
   });
 
