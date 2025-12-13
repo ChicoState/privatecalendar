@@ -74,8 +74,7 @@ const PRIORITY_OPTIONS = [
     { label: 'Low', value: 9 },
 ];
 
-// --- Date/Time Helpers (Simplified) ---
-
+// --- Date/Time Helpers ---
 // Helper to format date string from YYYYMMDDTHHMMSS to YYYY-MM-DD for display
 const formatDateForDisplay = (dt: string) => {
     if (!dt || dt.length < 8) return "No Date Set";
@@ -99,7 +98,7 @@ const parseDateParts = (dt: string) => {
     };
 };
 
-// Helper to initialize tempDateInput (now used both internally and externally)
+// Helper to initialize tempDateInput
 const initializeDateInputs = (data: TaskEventData): DateInputState => {
     const startParts = parseDateParts(data.DTstart);
     const endParts = parseDateParts(data.DTend);
@@ -113,8 +112,7 @@ const initializeDateInputs = (data: TaskEventData): DateInputState => {
     };
 };
 
-// --- Date Input Modal Component (Moved Outside App for stability) ---
-
+// --- Date Input Modal Component ---
 interface DateInputModalProps {
     visible: boolean;
     tempDateInput: DateInputState;
@@ -131,9 +129,7 @@ const defaultYear = nowDT.substring(0, 4);
 const defaultMonth = nowDT.substring(4, 6);
 const defaultDay = nowDT.substring(6, 8);
 
-
 // --- Picker Option Generation ---
-
 interface PickerOption {
     label: string;
     value: string;
@@ -157,12 +153,12 @@ const generateMonths = (): PickerOption[] => {
     return months;
 }
 
-// New helper for leap year logic
+// Helper for leap year logic
 const isLeapYear = (year: number) => {
     return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
 };
 
-// MODIFIED: Function to generate days dynamically based on month and year
+// Function to generate days dynamically based on month and year
 const getDaysInMonth = (yearStr: string, monthStr: string): number => {
     const year = parseInt(yearStr, 10);
     const month = parseInt(monthStr, 10);
@@ -198,11 +194,10 @@ const generateDays = (yearStr: string, monthStr: string): PickerOption[] => {
 
 const YEAR_OPTIONS = generateYears();
 const MONTH_OPTIONS = generateMonths();
-// DAY_OPTIONS is now generated dynamically
+// DAY_OPTIONS is generated dynamically
 // --- End Picker Option Generation ---
 
 // --- New Date Part Picker Modal ---
-
 interface DatePartPickerModalProps {
     visible: boolean;
     options: PickerOption[];
@@ -254,9 +249,7 @@ const DatePartPickerModal: React.FC<DatePartPickerModalProps> = ({
         </Modal>
     );
 };
-
 // --- End Date Part Picker Modal ---
-
 
 interface DateInputRowProps {
     type: "start" | "end";
@@ -407,7 +400,6 @@ const DateInputModal: React.FC<DateInputModalProps> = ({
     
     // Function to construct YYYYMMDD string and validate
     const constructDate = (year: string, month: string, day: string, name: string) => {
-        // ... (Logic remains mostly the same, as validation is still needed)
         const yearValue = year.trim();
         const monthValue = month.trim();
         const dayValue = day.trim();
@@ -522,9 +514,7 @@ const DateInputModal: React.FC<DateInputModalProps> = ({
         </Modal>
     );
 };
-
 // --- End Date Input Modal Component ---
-
 
 // Task Page
 const App: React.FC = () => {
@@ -678,7 +668,7 @@ const App: React.FC = () => {
         setModalVisible(false);
     };
     
-    // Deletes Task (No change)
+    // Deletes Task
     const handleDeleteTask = (index: number) => {
         const updated = [...tasks];
         updated.splice(index, 1);
@@ -686,7 +676,7 @@ const App: React.FC = () => {
         if (editIndex === index) setEditIndex(-1);
     };
 
-    // Deletes Task Modal handeler (No change)
+    // Deletes Task Modal handeler
     const handleModalDelete = () => {
         if (editIndex !== -1) {
             handleDeleteTask(editIndex);
@@ -757,7 +747,6 @@ const App: React.FC = () => {
         visible={modalVisible}
         onRequestClose={handleCancel}
         >
-        {/* TouchableWithoutFeedback removed here to fix numpad issue */}
         <View style={styles.modalBackdrop}>
             <ScrollView 
                 contentContainerStyle={styles.modalScroll}
@@ -779,7 +768,7 @@ const App: React.FC = () => {
                         autoFocus
                     />
                     
-                    {/* Date Input Button (Triggers DateInputModal) */}
+                    {/* Date Input Button */}
                     <TouchableOpacity 
                         style={styles.dateTimeButton} 
                         onPress={() => setDateInputModalVisible(true)}
@@ -904,7 +893,7 @@ const App: React.FC = () => {
         </View>
         </Modal>
 
-        {/* Date Input Modal (Now defined externally and passed props) */}
+        {/* Date Input Modal */}
         <DateInputModal 
             visible={dateInputModalVisible}
             tempDateInput={tempDateInput}
@@ -915,7 +904,7 @@ const App: React.FC = () => {
             initializeDateInputs={initializeDateInputs}
         />
 
-        {/* Custom Status Dropdown Modal (Uses TouchableWithoutFeedback) */}
+        {/* Custom Status Dropdown Modal */}
         <Modal
             animationType="fade"
             transparent
@@ -939,7 +928,7 @@ const App: React.FC = () => {
             </TouchableWithoutFeedback>
         </Modal>
 
-        {/* Custom Priority Dropdown Modal (Uses TouchableWithoutFeedback) */}
+        {/* Custom Priority Dropdown Modal */}
         <Modal
             animationType="fade"
             transparent
@@ -967,7 +956,7 @@ const App: React.FC = () => {
     </View>);
 };
 
-// CSS (Updated styles for picker)
+// CSS 
 const styles = StyleSheet.create({
     container: {flex: 1, padding: 40, marginTop: 40, backgroundColor: 'black'},
     title: { 
