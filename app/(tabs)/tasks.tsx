@@ -363,8 +363,8 @@ const DateInputModal: React.FC<DateInputModalProps> = ({
     setTaskData,
     initializeDateInputs
 }) => {
-
-    // MODIFIED: This function now includes logic to correct the day if month/year changes
+    
+    // Handler for selecting a date part
     const handleSelectDatePart = (field: keyof DateInputState, value: string) => {
         setTempDateInput(prev => {
             const newState = {
@@ -441,7 +441,7 @@ const DateInputModal: React.FC<DateInputModalProps> = ({
         let finalDTstart = startDTdatePart ? `${startDTdatePart}T000000` : "";
         let finalDTend = endDTdatePart ? `${endDTdatePart}T000000` : "";
 
-        // Auto-set DTend = DTstart if DTend is set and DTend is empty
+        // Auto-set DTend = DTstart if DTstart is set and DTend is empty
         if (finalDTstart && !finalDTend) {
             finalDTend = finalDTstart;
         }
@@ -459,6 +459,22 @@ const DateInputModal: React.FC<DateInputModalProps> = ({
             DTend: finalDTend,
         }));
 
+        setDateInputModalVisible(false);
+    };
+
+    // Clears both DTstart and DTend
+    const handleRemoveDates = () => {
+        // 1. Update the parent state with empty dates
+        setTaskData(prev => ({
+            ...prev,
+            DTstart: "",
+            DTend: "",
+        }));
+
+        // 2. Clear the local date input state to match
+        setTempDateInput(initializeDateInputs(DEFAULT_TASK_DATA));
+
+        // 3. Close the modal
         setDateInputModalVisible(false);
     };
 
@@ -493,7 +509,18 @@ const DateInputModal: React.FC<DateInputModalProps> = ({
                         />
                         
                         <View style={styles.modalButtons}>
+                            {/* Remove Dates Button (only shown if a date is set) */}
+                            {(taskData.DTstart || taskData.DTend) ? (
+                                <TouchableOpacity 
+                                    style={[styles.btn, styles.btnRemove]} 
+                                    onPress={handleRemoveDates}
+                                >
+                                    <Text style={styles.btnText}>Remove Dates</Text>
+                                </TouchableOpacity>
+                            ) : null}
+
                             <View style={{flex: 1}} />
+                            
                             <TouchableOpacity 
                                 style={[styles.btn, styles.btnCancel]} 
                                 onPress={handleCancelDateInput}
@@ -1222,6 +1249,7 @@ const styles = StyleSheet.create({
     btn: {paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8},
     btnCancel: {backgroundColor: "#555"}, 
     btnSave: {backgroundColor: "blue"},
+    btnRemove: {backgroundColor: "#c00"}, 
     btnText: {color: "white", fontWeight: "600"},
     dateTimeButton: {
         flexDirection: 'row',
