@@ -528,6 +528,13 @@ const App: React.FC = () => {
     const [statusDropdownVisible, setStatusDropdownVisible] = useState<boolean>(false);
     const [priorityDropdownVisible, setPriorityDropdownVisible] = useState<boolean>(false);
 
+    // NEW STATE: For managing collapsible sections
+    const [sectionsOpen, setSectionsOpen] = useState<{ [key: string]: boolean }>({
+        'Due Tasks': true,
+        'No Due Date': true,
+        'Completed': false, // Closed by default
+    });
+
     // STATE: Holds the raw, partial text input for date fields in the modal
     const [tempDateInput, setTempDateInput] = useState<DateInputState>(initializeDateInputs(DEFAULT_TASK_DATA));
     
@@ -602,10 +609,12 @@ const App: React.FC = () => {
         const endDT = taskData.DTend;
 
         if (startDT.length >= 8 && endDT.length >= 8) {
-             const startDate = new Date(startDT.substring(0, 8));
-             const endDate = new Date(endDT.substring(0, 8));
+             // Extract YYYYMMDD part
+             const startPart = startDT.substring(0, 8);
+             const endPart = endDT.substring(0, 8);
              
-             if (startDate.getTime() > endDate.getTime()) {
+             // Simple string comparison works here for YYYYMMDD
+             if (startPart > endPart) {
                  Alert.alert("Date Error", "Due date cannot be before start date.");
                  return;
              }
@@ -684,35 +693,133 @@ const App: React.FC = () => {
         }
     };
 
+    // NEW FUNCTION: Toggle task completion
+    const handleToggleComplete = (taskToToggle: Event, index: number) => {
+        const newStatus = taskToToggle.getstatusToDo() === 'COMPLETED' ? 'NEEDS-ACTION' : 'COMPLETED';
+        taskToToggle.setstatusToDo(newStatus);
+        
+        // Force a state update to trigger re-sort/re-render
+        setTasks([...tasks]); 
+    };
+
     type ItemProps = { item: Event; index: number }; 
 
+    // MODIFIED: Render item to include a checkbox
     const renderItem = ({ item, index }: ItemProps) => {
         const summary = item.getSummary();
         const location = item.getLocation();
         const dtend = item.getDTend();
+        const isCompleted = item.getstatusToDo() === 'COMPLETED';
 
         const endDateDisplay = formatDateForDisplay(dtend);
+        const taskIndex = tasks.findIndex(t => t.getUid() === item.getUid());
 
         return (
-            <View style={styles.task}>
-                <View style={{ flexShrink: 1 }}>
-                    <Text style={styles.itemList}>{summary || "No Title"} </Text>
+            <View style={[styles.task, isCompleted && styles.completedTask]}>
+                
+                {/* Completion Checkbox */}
+                <TouchableOpacity 
+                    onPress={() => handleToggleComplete(item, taskIndex)} 
+                    style={styles.checkbox}
+                >
+                    <MaterialCommunityIcons 
+                        name={isCompleted ? "checkbox-marked-circle" : "checkbox-blank-circle-outline"} 
+                        size={24} 
+                        color={isCompleted ? "#5cb85c" : "#ccc"} 
+                    />
+                </TouchableOpacity>
+
+                <View style={{ flexShrink: 1, flex: 1 }}>
+                    <Text style={[styles.itemList, isCompleted && styles.completedText]}>
+                        {summary || "No Title"} 
+                    </Text>
                     {location && (
-                        <Text style={{ ...styles.itemList, fontSize: 14, color: '#aaa' }}>
+                        <Text style={{ ...styles.itemList, fontSize: 14, color: isCompleted ? '#666' : '#aaa' }}>
                             Location: {location}
                         </Text>
                     )}
-                    {(endDateDisplay !== "No Date Set") && (
-                        <Text style={{ ...styles.itemList, fontSize: 14, color: '#aaa' }}>
+                    {(dtend && endDateDisplay !== "No Date Set") && (
+                        <Text style={{ ...styles.itemList, fontSize: 14, color: isCompleted ? '#666' : '#aaa' }}>
                             Due: {endDateDisplay}
                         </Text>
                     )}
                 </View>
                 <View style={styles.taskButtons}>
-                    <TouchableOpacity onPress={() => handleEditTask(index)} style={styles.iconButton}>
+                    <TouchableOpacity onPress={() => handleEditTask(taskIndex)} style={styles.iconButton}>
                         <MaterialCommunityIcons name="pencil" size={24} color="#5cb85c" /> 
                     </TouchableOpacity>
                 </View>
+            </View>
+        );
+    };
+
+    // NEW FUNCTION: Group and sort tasks
+    const getGroupedAndSortedTasks = () => {
+        const dueTasks: Event[] = [];
+        const noDueDateTasks: Event[] = [];
+        const completedTasks: Event[] = [];
+
+        tasks.forEach(task => {
+            const status = task.getstatusToDo();
+            const dtend = task.getDTend();
+
+            if (status === 'COMPLETED') {
+                completedTasks.push(task);
+            } else if (dtend && dtend.length >= 8) {
+                dueTasks.push(task);
+            } else {
+                noDueDateTasks.push(task);
+            }
+        });
+
+        // Sort Due Tasks by DTend ascending (earliest due date first)
+        dueTasks.sort((a, b) => {
+            // Compare the YYYYMMDD part
+            const aDate = a.getDTend().substring(0, 8);
+            const bDate = b.getDTend().substring(0, 8);
+            if (aDate < bDate) return -1;
+            if (aDate > bDate) return 1;
+            return 0;
+        });
+
+        // No Due Date and Completed tasks remain unsorted within their groups
+
+        return { dueTasks, noDueDateTasks, completedTasks };
+    };
+
+    const groupedTasks = getGroupedAndSortedTasks();
+
+    const renderSection = (title: string, data: Event[]) => {
+        const isOpen = sectionsOpen[title];
+        const count = data.length;
+
+        const toggleSection = () => {
+            setSectionsOpen(prev => ({ ...prev, [title]: !prev[title] }));
+        };
+
+        // If the array is empty, the section is completely hidden in the return block,
+        // but this function is only called if data.length > 0 anyway.
+        
+        return (
+            <View key={title} style={styles.sectionContainer}>
+                <TouchableOpacity style={styles.sectionHeader} onPress={toggleSection}>
+                    <Text style={styles.sectionTitle}>{title} ({count})</Text>
+                    <MaterialCommunityIcons 
+                        name={isOpen ? "chevron-up" : "chevron-down"} 
+                        size={24} 
+                        color="white" 
+                    />
+                </TouchableOpacity>
+                {isOpen && (
+                    <View style={styles.sectionContent}>
+                        {/* We use .map here to render items within the section's View */}
+                        {data.map((item, index) => (
+                            <View key={item.getUid() || index.toString()}>
+                                {renderItem({ item, index: tasks.findIndex(t => t.getUid() === item.getUid()) })}
+                            </View>
+                        ))}
+                    </View>
+                )}
             </View>
         );
     };
@@ -732,14 +839,14 @@ const App: React.FC = () => {
             <Text style={styles.addButtonText}>Add Task</Text>
         </TouchableOpacity>
 
-        {/* Task List */}
-        <FlatList
-            data={tasks}
-            renderItem={renderItem}
-            keyExtractor={(_, index) => index.toString()}
-            keyboardShouldPersistTaps="handled"
-        />
-
+        {/* Task List - NOW USING SCROLLVIEW FOR SECTIONS */}
+        <ScrollView style={styles.taskListScroll} keyboardShouldPersistTaps="handled">
+            {/* Conditional rendering: Only render a section if the corresponding array has tasks */}
+            {groupedTasks.dueTasks.length > 0 && renderSection('Due Tasks', groupedTasks.dueTasks)}
+            {groupedTasks.noDueDateTasks.length > 0 && renderSection('No Due Date', groupedTasks.noDueDateTasks)}
+            {groupedTasks.completedTasks.length > 0 && renderSection('Completed', groupedTasks.completedTasks)}
+        </ScrollView>
+        
         {/* Add/Edit Modal */}
         <Modal
         animationType="slide"
@@ -1052,12 +1159,24 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 15,
+        marginBottom: 8, // Reduced margin
         padding: 10,
         backgroundColor: "#333", 
         borderRadius: 8,
     },
+    completedTask: {
+        backgroundColor: "#2a2a2a", // Darker background for completed tasks
+        borderLeftWidth: 5,
+        borderLeftColor: '#5cb85c', // Green stripe
+    },
     itemList: {fontSize: 19, color: "white"},
+    completedText: {
+        textDecorationLine: 'line-through',
+        color: '#888',
+    },
+    checkbox: {
+        marginRight: 10,
+    },
     modalBackdrop: {
         flex: 1,
         backgroundColor: "rgba(0,0,0,0.8)", 
@@ -1151,6 +1270,39 @@ const styles = StyleSheet.create({
     pickerPlaceholderText: {
         color: '#888', // Match placeholder color
         fontSize: 16,
+    },
+    // New styles for task sections
+    taskListScroll: {
+        flex: 1,
+        paddingBottom: 20, // Add some padding at the bottom of the scroll view
+    },
+    sectionContainer: {
+        marginBottom: 15,
+        backgroundColor: '#222',
+        borderRadius: 8,
+        overflow: 'hidden', // To contain child views
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#333',
+        borderBottomWidth: 1,
+        borderBottomColor: '#444',
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: 'white',
+    },
+    sectionContent: {
+        padding: 8,
+    },
+    noTasksText: {
+        color: '#aaa',
+        padding: 10,
+        textAlign: 'center',
     }
 });
 
