@@ -20,16 +20,6 @@ export default class Event {
     private attendees?: string[]; //list of attendees.
     private creator!: string; //name of event creator.
 
-<<<<<<< HEAD
-    
-
-    constructor(
-        id?: string,  
-        Start?: string, 
-        End?: string, 
-        Sum?: string,    
-        founder?: string,
-=======
     defconstructor(){
         this.type = "VEVENT"
         this.uid = `${Date.now()}`;
@@ -54,7 +44,6 @@ export default class Event {
         End: string, 
         Sum: string,    
         founder: string,
->>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
         desc?: string,
         loc?: string,
         stat?:"CONFIRMED" | "CANCELLED" | "TENTATIVE",
@@ -65,13 +54,8 @@ export default class Event {
         )
     {
         //required values
-<<<<<<< HEAD
-        //Note that if an input is not entered, it will default to the values right of the ??
-        
-=======
         //Creates a random UID for the event, current date + random number
         this.type = type
->>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
         this.uid = `${Date.now()}`;
         this.DTStamp = new Date(); //set current timestamp on creation
         this.DTstart = Start ?? "TZID=America/New_York:20130802T103400";
@@ -81,13 +65,6 @@ export default class Event {
 
         // optional values
 
-<<<<<<< HEAD
-        this.description = desc ?? "This is a test description";
-        this.location = loc ?? "Somewhere";
-        this.status = stat ?? "TENTATIVE";
-        this.rRule = recur ?? "";
-        this.attendees = participantList ?? ["Dan", "Hellen", "Phillipe", "Aubrey", "Leigh", "Lyle"];
-=======
         this.description = desc;
         this.location = loc;
         this.status = stat;
@@ -95,18 +72,14 @@ export default class Event {
         this.priority = priority
         this.rRule = recur;
         this.attendees = participantList;
->>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     }
 
     /* Getters */
 
-<<<<<<< HEAD
-=======
     public getType(): "VEVENT" | "VTODO" | undefined {
         return this.type
     }
 
->>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     public getUid(): string {
         return this.uid;
     }
@@ -138,8 +111,6 @@ export default class Event {
     public getStatus(): "CONFIRMED" | "CANCELLED" | "TENTATIVE" | undefined {
         return this.status;
     }
-<<<<<<< HEAD
-=======
 
     public getstatusToDo(): "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED" | undefined {
         return this.statusToDo;
@@ -148,7 +119,6 @@ export default class Event {
     public getPriority(): number {
         return this.priority;
     }
->>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     
     public getRRule(): string | undefined {
         return this.rRule;
@@ -197,8 +167,6 @@ export default class Event {
         this.status = Stat;
         this.setDTStamp(new Date());
     }
-<<<<<<< HEAD
-=======
 
     public setstatusToDo(Stat: "NEEDS-ACTION" | "COMPLETED" | "IN-PROCESS" | "CANCELLED"): void {
         this.statusToDo = Stat;
@@ -215,7 +183,6 @@ export default class Event {
         this.priority = Prio;
         this.setDTStamp(new Date());
     }
->>>>>>> 9fb053b9e3fb37cbe9ee26bff7d062307f9b4abf
     
     public setRRule(Recur: string | undefined): void {
         this.rRule = Recur;
