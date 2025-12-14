@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import Event from "../utils/eventFramework";
+import { useTasks } from "../utils/TaskContext";
+
 import {
   View,
   Text,
@@ -61,7 +63,8 @@ const PRIORITY_OPTIONS = [
 
 // Task Page
 const App: React.FC = () => {
-    const [tasks, setTasks] = useState<Event[]>([]); 
+    const { tasks, setTasks } = useTasks();
+ 
     const [taskData, setTaskData] = useState<TaskEventData>(DEFAULT_TASK_DATA); 
     const [editIndex, setEditIndex] = useState<number>(-1);
     const [modalVisible, setModalVisible] = useState<boolean>(false);
