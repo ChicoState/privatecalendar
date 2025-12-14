@@ -44,6 +44,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "unstable_exclude": ["**/*.test.js"]
+      }
     }
   }
 }

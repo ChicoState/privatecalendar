@@ -58,10 +58,10 @@ export default class Event {
         this.type = type
         this.uid = `${Date.now()}`;
         this.DTStamp = new Date(); //set current timestamp on creation
-        this.DTstart = Start;
-        this.DTend = End;
-        this.summary = Sum;
-        this.creator = founder;
+        this.DTstart = Start ?? "TZID=America/New_York:20130802T103400";
+        this.DTend = End ?? "TZID=America/New_York:20130802T110400";
+        this.summary = Sum ?? "Event Name";
+        this.creator = founder ?? "Sam";
 
         // optional values
 
