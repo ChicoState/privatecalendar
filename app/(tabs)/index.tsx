@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-
 import {
   StyleSheet,
   Button,
@@ -21,6 +20,7 @@ import AsyncStorage from 'expo-sqlite/kv-store';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as SQLite from 'expo-sqlite';
+import { Picker } from '@react-native-picker/picker';
 
 // --- Types ---
 type DayPress = { dateString: string; day: number; month: number; year: number; timestamp: number };
@@ -31,10 +31,12 @@ type EventItem = {
   allDay: boolean;
   start: string; // ISO
   end: string;   // ISO
+  category?: string;
 };
 type EventsByDate = Record<string, EventItem[]>; // "YYYY-MM-DD" -> events[]
 
 const STORAGE_KEY = 'my_calendar_events_v1';
+const CATEGORY_STORAGE_KEY = 'my_calendar_categories_v1';
 const randomId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 // --- ICS Utilities ---
@@ -42,7 +44,9 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 const formatDateBasic = (d: Date) =>
   `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}`;
 const formatDateTimeUTC = (d: Date) =>
-  `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`;
+  `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}T${pad2(
+    d.getUTCHours()
+  )}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`;
 
 const escapeICS = (s: string) =>
   (s ?? '')
@@ -63,20 +67,21 @@ function flattenEvents(evMap: EventsByDate): EventItem[] {
   return out;
 }
 
-
-
-/** Build an .ics file (VCALENDAR) from all events */
 function buildICS(evMap: EventsByDate) {
   const events = flattenEvents(evMap);
   const lines: string[] = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//YourApp//InAppCalendar//EN',
-    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//YourApp//InAppCalendar//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
   ];
   const dtstamp = formatDateTimeUTC(new Date());
 
   for (const ev of events) {
     const uid = (ev.id || Math.random().toString(36).slice(2)) + '@yourapp.local';
-    let dtstart = '', dtend = '';
+    let dtstart = '';
+    let dtend = '';
 
     if (ev.allDay) {
       const s = new Date(ev.start);
@@ -89,8 +94,13 @@ function buildICS(evMap: EventsByDate) {
     }
 
     lines.push(
-      'BEGIN:VEVENT', `UID:${uid}`, `DTSTAMP:${dtstamp}`, dtstart, dtend,
-      `SUMMARY:${escapeICS(ev.title || 'Event')}`, 'END:VEVENT'
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${dtstamp}`,
+      dtstart,
+      dtend,
+      `SUMMARY:${escapeICS(ev.title || 'Event')}`,
+      'END:VEVENT'
     );
   }
 
@@ -98,7 +108,28 @@ function buildICS(evMap: EventsByDate) {
   return lines.join('\r\n');
 }
 
-  // Day View (Hour-by-hour timeline)
+async function exportICS(evMap: EventsByDate) {
+  try {
+    const ics = buildICS(evMap);
+    const fileUri = FileSystem.Paths.cache + `my-events-${Date.now()}.ics`;
+
+    await FileSystem.writeAsStringAsync(fileUri, ics);
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/calendar',
+        UTI: 'public.calendar-event',
+        dialogTitle: 'Export .ics',
+      });
+    } else {
+      Alert.alert('ICS saved', fileUri);
+    }
+  } catch (e: any) {
+    Alert.alert('Export failed', e?.message ?? String(e));
+  }
+}
+
+// Day View (Hour-by-hour timeline)
 const DayRoute = () => {
   const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
 
@@ -143,70 +174,87 @@ type Notification = {
   anim: Animated.Value;
 };
 
+// --- MonthRoute ---
 type MonthRouteProps = {
-  // calendar + events
   selected: string;
   markedDates: Record<string, any>;
   setSelected: (date: string) => void;
   eventsForSelected: EventItem[];
   removeEvent: (dateKey: string, id: string) => void;
+  addEventLocal: () => void;
+  exportICS: () => void;
 
-  // form
-  title: string; setTitle: (t: string) => void;
-  allDay: boolean; setAllDay: (v: boolean) => void;
-  startHour: string; setStartHour: (t: string) => void;
-  endHour: string; setEndHour: (t: string) => void;
-  multiDay: boolean; setMultiDay: (v: boolean) => void;
-  daysLong: string; setDaysLong: (d: string) => void;
+  // Form props
+  title: string;
+  setTitle: (t: string) => void;
+  allDay: boolean;
+  setAllDay: (v: boolean) => void;
+  startHour: string;
+  setStartHour: (t: string) => void;
+  endHour: string;
+  setEndHour: (t: string) => void;
+  multiDay: boolean;
+  setMultiDay: (v: boolean) => void;
+  daysLong: string;
+  setDaysLong: (d: string) => void;
+  category: string;
+  setCategory: (c: string) => void;
 
-  // actions
-  onAddEventWithNotification: () => void;
+  categories: string[];
+  newCategory: string;
+  setNewCategory: (c: string) => void;
+  addCategory: () => void;
 
   // notifications
   notifications: Notification[];
 };
 
-
-const MonthRoute: React.FC<MonthRouteProps> = ({
-  selected,
-  markedDates,
-  setSelected,
-  eventsForSelected,
-  removeEvent,
-  title,
-  setTitle,
-  allDay,
-  setAllDay,
-  startHour,
-  setStartHour,
-  endHour,
-  setEndHour,
-  multiDay,
-  setMultiDay,
-  daysLong,
-  setDaysLong,
-  onAddEventWithNotification,
-  notifications,
-}) => {
+// Month View: contains the Calendar, notifications, and the event creation form
+const MonthRoute = (props: MonthRouteProps) => {
   const insets = useSafeAreaInsets();
+  const {
+    selected,
+    markedDates,
+    setSelected,
+    eventsForSelected,
+    removeEvent,
+    addEventLocal,
+    exportICS: handleExportICS,
+    title,
+    setTitle,
+    allDay,
+    setAllDay,
+    startHour,
+    setStartHour,
+    endHour,
+    setEndHour,
+    multiDay,
+    setMultiDay,
+    daysLong,
+    setDaysLong,
+    category,
+    setCategory,
+    categories,
+    newCategory,
+    setNewCategory,
+    addCategory,
+    notifications,
+  } = props;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.flex}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.select({ ios: 'padding', android: 'height' })}
-        keyboardVerticalOffset={insets.top}
+        keyboardVerticalOffset={insets.top + 48} // Adjusted offset to clear TabBar/Safe Area
       >
         {/* Notification stack */}
         {notifications.length > 0 && (
           <View
-            style={[
-              styles.notificationsContainer,
-              { top: insets.top + 8 },
-            ]}
+            style={[styles.notificationsContainer, { top: insets.top + 8 }]}
             pointerEvents="none"
           >
-            {[...notifications].reverse().map(n => (
+            {[...notifications].reverse().map((n) => (
               <Animated.View
                 key={n.id}
                 style={[
@@ -241,7 +289,7 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
             theme={{
               todayTextColor: '#007AFF',
               arrowColor: '#007AFF',
-              selectedDayBackgroundColor: 'orange',
+              selectedDayBackgroundColor: 'orange', // Use custom orange from markedDates
               textMonthFontWeight: 'bold',
             }}
           />
@@ -249,6 +297,7 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
           <View style={styles.section}>
             <View style={styles.rowBetween}>
               <Text style={styles.h4}>Selected date</Text>
+              <Button title="Export .ics" onPress={handleExportICS} />
             </View>
             <Text style={styles.value}>{selected || '—'}</Text>
           </View>
@@ -268,6 +317,33 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
               <Text style={styles.labelInline}>All-day</Text>
               <Switch value={allDay} onValueChange={setAllDay} />
             </View>
+
+            <Text style={styles.h4}>Category</Text>
+            <Picker
+              selectedValue={category}
+              onValueChange={(value) => setCategory(value)}
+              style={{
+                backgroundColor: '#A9A9A9', // light gray
+                color: 'black',
+              }}
+            >
+              {categories.map((cat) => (
+                <Picker.Item
+                  key={cat}
+                  label={cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  value={cat}
+                />
+              ))}
+            </Picker>
+
+            <Text style={styles.label2}>Add new category</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter new category"
+              value={newCategory}
+              onChangeText={setNewCategory}
+            />
+            <Button title="Add Category" onPress={addCategory} />
 
             {!allDay && (
               <>
@@ -307,7 +383,7 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
 
             <Button
               title="Add to in-app calendar"
-              onPress={onAddEventWithNotification}
+              onPress={addEventLocal}
               disabled={!selected}
             />
           </View>
@@ -317,7 +393,7 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
             {eventsForSelected.length === 0 ? (
               <Text style={styles.muted}>No events yet</Text>
             ) : (
-              eventsForSelected.map(ev => {
+              eventsForSelected.map((ev) => {
                 const start = new Date(ev.start);
                 const end = new Date(ev.end);
                 const timeText = ev.allDay
@@ -326,12 +402,23 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
                         ? ` (${start.toDateString()} → ${end.toDateString()})`
                         : ''
                     }`
-                  : `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                  : `${start.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })} — ${end.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}`;
 
                 return (
                   <View key={ev.id} style={styles.eventCard}>
                     <Text style={styles.addEventTittle}>• {ev.title}</Text>
                     <Text style={styles.addEventTime}>{timeText}</Text>
+                    {ev.category && (
+                      <Text style={styles.addEventCategory}>
+                        Category: {ev.category}
+                      </Text>
+                    )}
                     <View style={{ height: 8 }} />
                     <Button title="Delete" onPress={() => removeEvent(selected, ev.id)} />
                   </View>
@@ -344,584 +431,7 @@ const MonthRoute: React.FC<MonthRouteProps> = ({
     </SafeAreaView>
   );
 };
-export default function App() {
-  const layout = Dimensions.get('window');
-  const [index, setIndex] = useState(2); // start on Month
-  const [routes] = useState([
-    { key: 'day', title: 'Day' },
-    { key: 'week', title: 'Week' },
-    { key: 'month', title: 'Month' },
-  ]);
 
-  // ---- shared calendar state ----
-  const [selected, setSelected] = useState('');
-  const [events, setEvents] = useState<EventsByDate>({});
-
-  const [title, setTitle] = useState('');
-  const [allDay, setAllDay] = useState(false);
-  const [startHour, setStartHour] = useState('10:00');
-  const [endHour, setEndHour] = useState('11:00');
-  const [multiDay, setMultiDay] = useState(false);
-  const [daysLong, setDaysLong] = useState('2');
-
-  // ---- load & save events ----
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setEvents(JSON.parse(raw));
-      } catch (e) {
-        console.warn('Failed to load events', e);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
-  }, [events]);
-
-  const MAX_DOTS = 3;
-  const markedDates = useMemo(() => {
-    const out: Record<string, any> = {};
-    const palette = ['#ff3b30', '#ff9500', '#5856d6', '#34c759', '#00bcd4', '#9c27b0'];
-
-    for (const [date, list] of Object.entries(events)) {
-      if (!Array.isArray(list) || list.length === 0) continue;
-
-      const dots = list.slice(0, MAX_DOTS).map((ev, i) => ({
-        key: ev.id ?? `${date}-dot-${i}`,
-        color: palette[i % palette.length],
-      }));
-
-      out[date] = { ...(out[date] || {}), dots };
-    }
-
-    if (selected) {
-      out[selected] = {
-        ...(out[selected] || {}),
-        selected: true,
-        selectedColor: 'orange',
-        disableTouchEvent: true,
-      };
-    }
-    return out;
-  }, [events, selected]);
-
-  const parseTime = (hhmm: string) => {
-    const [h, m] = hhmm.split(':').map(Number);
-    return { h: Number.isFinite(h) ? h : 10, m: Number.isFinite(m) ? m : 0 };
-  };
-
-  const toLocalDate = (dateStr: string, h = 0, m = 0) => {
-    const [y, mo, d] = dateStr.split('-').map(Number);
-    return new Date(y, (mo ?? 1) - 1, d ?? 1, h, m, 0, 0);
-  };
-
-  const addEventLocal = useCallback(() => {
-    if (!selected) return;
-
-    let start = toLocalDate(selected);
-    let end = toLocalDate(selected);
-
-    if (allDay) {
-      const days = multiDay ? Math.max(1, parseInt(daysLong || '1', 10)) : 1;
-      end = new Date(start);
-      end.setDate(start.getDate() + days);
-    } else {
-      const { h: sh, m: sm } = parseTime(startHour);
-      const { h: eh, m: em } = parseTime(endHour);
-      start = toLocalDate(selected, sh, sm);
-      end = toLocalDate(selected, eh, em);
-      if (multiDay) {
-        const extra = Math.max(1, parseInt(daysLong || '1', 10)) - 1;
-        end.setDate(end.getDate() + extra);
-      }
-      if (end <= start) {
-        Alert.alert('Invalid time', 'End time must be after start time.');
-        return;
-      }
-    }
-
-    const ev: EventItem = {
-      id: randomId(),
-      title: title.trim() || 'New Event',
-      allDay,
-      start: start.toISOString(),
-      end: end.toISOString(),
-    };
-
-    setEvents(prev => {
-      const copy = { ...prev };
-      const key = selected;
-      copy[key] = [...(copy[key] || []), ev];
-      return copy;
-    });
-  }, [selected, allDay, multiDay, daysLong, startHour, endHour, title]);
-
-  const removeEvent = useCallback((dateKey: string, id: string) => {
-    setEvents(prev => {
-      const list = prev[dateKey] || [];
-      return { ...prev, [dateKey]: list.filter(e => e.id !== id) };
-    });
-  }, []);
-
-  const eventsForSelected = events[selected] || [];
-
-  // ---- notifications / toasts ----
-  const BANNER_DURATION = 1500;
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const nextIdRef = useRef(0);
-
-  const showNotification = (message: string) => {
-    const id = nextIdRef.current++;
-    const anim = new Animated.Value(0);
-    const newNotification: Notification = { id, message, anim };
-
-    setNotifications(prev => [...prev, newNotification]);
-
-    Animated.sequence([
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.delay(BANNER_DURATION),
-      Animated.timing(anim, {
-        toValue: 0,
-        duration: 2200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    });
-  };
-
-  const onAddEventWithNotification = () => {
-    addEventLocal();
-    if (title.trim()) {
-      showNotification(`Added event: ${title.trim()}`);
-    } else {
-      showNotification('Added event');
-    }
-  };
-
-  // ---- TabView scene renderer ----
-  const renderScene = ({ route }: { route: { key: string } }) => {
-    switch (route.key) {
-      case 'day':
-        return <DayRoute />;
-      case 'week':
-        return <WeekRoute />;
-      case 'month':
-        return (
-          <MonthRoute
-            selected={selected}
-            markedDates={markedDates}
-            setSelected={setSelected}
-            eventsForSelected={eventsForSelected}
-            removeEvent={removeEvent}
-            title={title} setTitle={setTitle}
-            allDay={allDay} setAllDay={setAllDay}
-            startHour={startHour} setStartHour={setStartHour}
-            endHour={endHour} setEndHour={setEndHour}
-            multiDay={multiDay} setMultiDay={setMultiDay}
-            daysLong={daysLong} setDaysLong={setDaysLong}
-            notifications={notifications}
-            onAddEventWithNotification={onAddEventWithNotification}
-          />
-        );
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <TabView
-      navigationState={{ index, routes }}
-      renderScene={renderScene}
-      onIndexChange={setIndex}
-      initialLayout={{ width: layout.width }}
-      renderTabBar={(props) => (
-        <SafeAreaView style={{ backgroundColor: styles.tabBar.backgroundColor }}>
-          <TabBar
-            {...props}
-            style={styles.tabBar}
-            indicatorStyle={styles.indicator}
-          />
-        </SafeAreaView>
-      )}
-    />
-  );
-}
-
-/*
-export default function App() {
-  const insets = useSafeAreaInsets();
-
-  const BANNER_DURATION = 1500; // visible time in ms
-
-  // inside your component:
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const nextIdRef = useRef(0);
-  
-
-type Notification = {
-    id: number;
-    message: string;
-    anim: Animated.Value;
-  };
-
-const showNotification = (message: string) => {
-  
-  const id = nextIdRef.current++; // incremental ID for the notification
-  const anim = new Animated.Value(0);
-
-  const newNotification: Notification = { id, message, anim };
-
-  //console.log('Showing notification:', message);
-  // Add to list
-  setNotifications(prev => [...prev, newNotification]);
-  
-  // Animate: fade in -> delay -> fade out
-  Animated.sequence([
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }),
-    Animated.delay(BANNER_DURATION),
-    Animated.timing(anim, {
-      toValue: 0,
-      duration: 2200,
-      useNativeDriver: true,
-    }),
-  ]).start(() => {
-    // Remove when finished
-    setNotifications(prev => prev.filter(n => n.id !== id));
-    //console.log('removing notification:', id);
-  });
-};
-
-  const [selected, setSelected] = useState('');
-  const [events, setEvents] = useState<EventsByDate>({});
-
-  // simple form
-  const [title, setTitle] = useState('New Event');
-  const [allDay, setAllDay] = useState(false);
-  const [startHour, setStartHour] = useState('10:00'); // HH:mm local
-  const [endHour, setEndHour] = useState('11:00');
-  const [multiDay, setMultiDay] = useState(false);
-  const [daysLong, setDaysLong] = useState('2');
-
-  // load & persist
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setEvents(JSON.parse(raw));
-      } catch (e) {
-        console.warn('Failed to load events', e);
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
-  }, [events]);
-
-  
-  const dotColor: Record<string, string> = {
-  meeting: '#ff3b30',
-  class:   '#5856d6',
-  todo:    '#34c759',
-  default: '#ff9500',
-};
-
-const MAX_DOTS = 3; // max dots to show per day
-
-const markedDates = useMemo(() => {
-  const out: Record<string, any> = {};
-
-  for (const [date, list] of Object.entries(events)) {
-    if (!Array.isArray(list) || list.length === 0) continue;
-
-    // One dot per event, each MUST have a unique `key`
-    const palette = ['#ff3b30', '#ff9500', '#5856d6', '#34c759', '#00bcd4', '#9c27b0'];
-    const dots = list.slice(0, MAX_DOTS).map((ev, i) => ({
-      key: ev.id ?? `${date}-dot-${i}`,     // unique
-      color: palette[i % palette.length],   // rotate colors (or pick a single color)
-    }));
-
-    // IMPORTANT: put dots under the date entry
-    out[date] = { ...(out[date] || {}), dots };
-  }
-
-  // Merge selection without losing dots
-  if (selected) {
-    out[selected] = {
-      ...(out[selected] || {}),
-      selected: true,
-      selectedColor: 'orange',
-      disableTouchEvent: true,
-    };
-  }
-  return out;
-}, [events, selected]);
-
-  const parseTime = (hhmm: string) => {
-    const [h, m] = hhmm.split(':').map(Number);
-    return { h: Number.isFinite(h) ? h : 10, m: Number.isFinite(m) ? m : 0 };
-  };
-  const toLocalDate = (dateStr: string, h = 0, m = 0) => {
-    const [y, mo, d] = dateStr.split('-').map(Number);
-    return new Date(y, (mo ?? 1) - 1, d ?? 1, h, m, 0, 0);
-  };
-
-
-
-  
-  const [bannerVisible, setBannerVisible] = useState<boolean>(false);
-  const [bannerMessage, setBannerMessage] = useState<string>('');
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-
-  const bannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-const showBanner = (message: string) => {
-  setBannerMessage(message);
-  setBannerVisible(true);
-
-  fadeAnim.setValue(0);
-
-  Animated.sequence([
-    Animated.timing(fadeAnim, {
-      toValue: 1,           // fade in
-      duration: 200,
-      useNativeDriver: true,
-    }),
-    Animated.delay(1500),   // stay visible for 1.5s
-    Animated.timing(fadeAnim, {
-      toValue: 0,           // fade out
-      duration: 200,
-      useNativeDriver: true,
-    }),
-  ]).start(() => {
-    setBannerVisible(false);
-  });
-};
-
-  const addEventLocal = useCallback(() => {
-    if (!selected) return;
-
-    //showBanner('Event added to in-app calendar');
-    let start = toLocalDate(selected);
-    let end = toLocalDate(selected);
-
-    if (allDay) {
-      const days = multiDay ? Math.max(1, parseInt(daysLong || '1', 10)) : 1;
-      // DTEND for all-day is exclusive; store end as the *day after* the last day
-      end = new Date(start);
-      end.setDate(start.getDate() + days);
-    } else {
-      const { h: sh, m: sm } = parseTime(startHour);
-      const { h: eh, m: em } = parseTime(endHour);
-      start = toLocalDate(selected, sh, sm);
-      end = toLocalDate(selected, eh, em);
-      if (multiDay) {
-        const extra = Math.max(1, parseInt(daysLong || '1', 10)) - 1;
-        end.setDate(end.getDate() + extra);
-      }
-      if (end <= start) {
-        Alert.alert('Invalid time', 'End time must be after start time.');
-        return;
-      }
-    }
-
-    const ev: EventItem = {
-      id: randomId(),
-      title: title.trim() || 'New Event',
-      allDay,
-      start: start.toISOString(),
-      end: end.toISOString(),
-    };
-
-    setEvents(prev => {
-      const copy = { ...prev };
-      const key = selected;
-      copy[key] = [...(copy[key] || []), ev];
-      return copy;
-    });
-
-    // optional: clear title per add
-    // setTitle('New Event');
-  }, [selected, allDay, multiDay, daysLong, startHour, endHour, title]);
-
-  const handleAddEventLocal = () => {
-    addEventLocal();
-    showNotification(`Added event: ${title}`);
-  };
-  const removeEvent = (dateKey: string, id: string) => {
-    setEvents(prev => {
-      const list = prev[dateKey] || [];
-      return { ...prev, [dateKey]: list.filter(e => e.id !== id) };
-    });
-  };
-
-  async function exportICS(evMap: EventsByDate) {
-  try {
-    const ics = buildICS(evMap);
-    const fileUri = FileSystem.Paths.cache + `my-events-${Date.now()}.ics`;
-
-    await FileSystem.writeAsStringAsync(fileUri, ics);
-
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(fileUri, {
-        mimeType: 'text/calendar',
-        UTI: 'public.calendar-event',
-        dialogTitle: 'Export .ics',
-      });
-    } else {
-      Alert.alert('ICS saved', fileUri);
-    }
-  } catch (e: any) {
-    Alert.alert('Export failed', e?.message ?? String(e));
-  }
-};
-
-
-  
-  const eventsForSelected = events[selected] || [];
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.select({ ios: 'padding', android: 'height' })}
-        keyboardVerticalOffset={insets.top}
-      >
-        {notifications.length > 0 && (
-      <View
-        style={[
-          styles.notificationsContainer,
-          { top: insets.top + 8 },
-        ]}
-        pointerEvents="none"
-      >
-        {[...notifications].reverse().map(n => (
-          <Animated.View
-            key={n.id}
-            style={[
-              styles.banner,
-              {
-                opacity: n.anim,
-                // optional small slide; safe because each item takes its own row
-                transform: [
-                  {
-                    translateY: n.anim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-6, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <Text style={styles.bannerText}>{n.message}</Text>
-          </Animated.View>
-        ))}
-      </View>
-    )}
-        
-        
-        <ScrollView
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 24 }]}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Calendar
-            onDayPress={(d: DayPress) => setSelected(d.dateString)}
-            markedDates={markedDates}
-            markingType="multi-dot"
-            theme={{
-              todayTextColor: '#007AFF',
-              arrowColor: '#007AFF',
-              selectedDayBackgroundColor: 'orange', // Use custom orange from markedDates
-              textMonthFontWeight: 'bold',
-            }}
-          />
-
-          <View style={styles.section}>
-            <View style={styles.rowBetween}>
-              <Text style={styles.h4}>Selected date</Text>
-            </View>
-            <Text style={styles.value}>{selected || '—'}</Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.h4}>Create event (in-app)</Text>
-
-            <Text style={styles.label2}>Title</Text>
-            <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="Event title" />
-
-            <View style={styles.rowBetween}>
-              <Text style={styles.labelInline}>All-day</Text>
-              <Switch value={allDay} onValueChange={setAllDay} />
-            </View>
-
-            {!allDay && (
-              <>
-                <Text style={styles.label2}>Start (HH:mm)</Text>
-                <TextInput style={styles.input} value={startHour} onChangeText={setStartHour} keyboardType="numbers-and-punctuation" />
-                <Text style={styles.label2}>End (HH:mm)</Text>
-                <TextInput style={styles.input} value={endHour} onChangeText={setEndHour} keyboardType="numbers-and-punctuation" />
-              </>
-            )}
-
-            <View style={styles.rowBetween}>
-              <Text style={styles.labelInline}>Multi-day</Text>
-              <Switch value={multiDay} onValueChange={setMultiDay} />
-            </View>
-
-            {multiDay && (
-              <>
-                <Text style={styles.label2}># of days</Text>
-                <TextInput style={styles.input} value={daysLong} onChangeText={setDaysLong} keyboardType="number-pad" />
-              </>
-            )}
-
-            <Button title="Add to in-app calendar" onPress={handleAddEventLocal} disabled={!selected} />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.h4}>Events on {selected || '—'}</Text>
-            {eventsForSelected.length === 0 ? (
-              <Text style={styles.muted}>No events yet</Text>
-            ) : (
-              eventsForSelected.map(ev => {
-                const start = new Date(ev.start);
-                const end = new Date(ev.end);
-                const timeText = ev.allDay
-                  ? `All-day${start.toDateString() !== end.toDateString() ? ` (${start.toDateString()} → ${end.toDateString()})` : ''}`
-                  : `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-                return (
-                  <View key={ev.id} style={styles.eventCard}>
-                    <Text style={styles.addEventTittle}>• {ev.title}</Text>
-                    <Text style={styles.addEventTime}>{timeText}</Text>
-                    <View style={{ height: 8 }} />
-                    <Button title="Delete" onPress={() => removeEvent(selected, ev.id)} />
-                  </View>
-                );
-              })
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-};
-*/
-
-/*
 // ---------- Main Calendar Screen ----------
 export default function CalendarScreen() {
   const layout = Dimensions.get('window');
@@ -942,8 +452,17 @@ export default function CalendarScreen() {
   const [endHour, setEndHour] = useState('11:00');
   const [multiDay, setMultiDay] = useState(false);
   const [daysLong, setDaysLong] = useState('2');
+  const [category, setCategory] = useState<string>('personal');
 
-  // load & persist
+  const [categories, setCategories] = useState<string[]>([
+    'general',
+    'work',
+    'personal',
+    'school',
+  ]);
+  const [newCategory, setNewCategory] = useState('');
+
+  // load & persist events
   useEffect(() => {
     (async () => {
       try {
@@ -958,6 +477,42 @@ export default function CalendarScreen() {
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
   }, [events]);
+
+  // load & persist categories
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CATEGORY_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCategories(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load categories', e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => {});
+  }, [categories]);
+
+  const addCategory = useCallback(() => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+
+    const key = trimmed.toLowerCase();
+
+    setCategories((prev) => {
+      if (prev.includes(key)) return prev;
+      return [...prev, key];
+    });
+
+    setCategory(key);
+    setNewCategory('');
+  }, [newCategory]);
 
   const MAX_DOTS = 3;
 
@@ -1027,26 +582,66 @@ export default function CalendarScreen() {
       allDay,
       start: start.toISOString(),
       end: end.toISOString(),
+      category,
     };
 
-    setEvents(prev => {
+    setEvents((prev) => {
       const copy = { ...prev };
       const key = selected;
       copy[key] = [...(copy[key] || []), ev];
       return copy;
     });
-  }, [selected, allDay, multiDay, daysLong, startHour, endHour, title]);
+  }, [selected, allDay, multiDay, daysLong, startHour, endHour, title, category]);
 
   const removeEvent = useCallback((dateKey: string, id: string) => {
-    setEvents(prev => {
+    setEvents((prev) => {
       const list = prev[dateKey] || [];
-      return { ...prev, [dateKey]: list.filter(e => e.id !== id) };
+      return { ...prev, [dateKey]: list.filter((e) => e.id !== id) };
     });
   }, []);
 
   const handleExportICS = useCallback(() => exportICS(events), [events]);
 
   const eventsForSelected = events[selected] || [];
+
+  // ---- notifications / toasts ----
+  const BANNER_DURATION = 1500;
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const nextIdRef = useRef(0);
+
+  const showNotification = (message: string) => {
+    const id = nextIdRef.current++;
+    const anim = new Animated.Value(0);
+    const newNotification: Notification = { id, message, anim };
+
+    setNotifications((prev) => [...prev, newNotification]);
+
+    Animated.sequence([
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.delay(BANNER_DURATION),
+      Animated.timing(anim, {
+        toValue: 0,
+        duration: 2200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    });
+  };
+
+  const handleAddEventLocalWithNotification = () => {
+    if (!selected) return;
+    addEventLocal();
+    if (title.trim()) {
+      showNotification(`Added event: ${title.trim()}`);
+    } else {
+      showNotification('Added event');
+    }
+  };
 
   // Pass all state and handlers to MonthRoute
   const renderScene = ({ route }: { route: { key: string } }) => {
@@ -1063,14 +658,27 @@ export default function CalendarScreen() {
             setSelected={setSelected}
             eventsForSelected={eventsForSelected}
             removeEvent={removeEvent}
-            addEventLocal={addEventLocal}
+            addEventLocal={handleAddEventLocalWithNotification}
             exportICS={handleExportICS}
-            title={title} setTitle={setTitle}
-            allDay={allDay} setAllDay={setAllDay}
-            startHour={startHour} setStartHour={setStartHour}
-            endHour={endHour} setEndHour={setEndHour}
-            multiDay={multiDay} setMultiDay={setMultiDay}
-            daysLong={daysLong} setDaysLong={setDaysLong}
+            title={title}
+            setTitle={setTitle}
+            allDay={allDay}
+            setAllDay={setAllDay}
+            startHour={startHour}
+            setStartHour={setStartHour}
+            endHour={endHour}
+            setEndHour={setEndHour}
+            multiDay={multiDay}
+            setMultiDay={setMultiDay}
+            daysLong={daysLong}
+            setDaysLong={setDaysLong}
+            category={category}
+            setCategory={setCategory}
+            categories={categories}
+            newCategory={newCategory}
+            setNewCategory={setNewCategory}
+            addCategory={addCategory}
+            notifications={notifications}
           />
         );
       default:
@@ -1090,7 +698,7 @@ export default function CalendarScreen() {
             {...props}
             style={styles.tabBar}
             indicatorStyle={styles.indicator}
-            //labelStyle={styles.label}
+            // labelStyle={styles.label}
           />
         </SafeAreaView>
       )}
@@ -1098,111 +706,115 @@ export default function CalendarScreen() {
   );
 }
 
-*/
-
-
 // ---------- Styles ----------
 const styles = StyleSheet.create({
-    monthContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      paddingTop: 20,
-    },
-    tabBar: {
-      backgroundColor: '#007AFF',
-    },
-    indicator: {
-      backgroundColor: 'white',
-      height: 3,
-    },
-    label: {
-      fontWeight: '600',
-      color: 'white', 
-    },
-    // Day View Styles
-    dayScroll: {
-      flex: 1,
-      backgroundColor: '#ffffffff',
-    },
-    hourRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      height: 60,
-      borderBottomColor: '#E0E0E0',
-      borderBottomWidth: 1,
-    },
-    hourText: {
-      width: 50,
-      textAlign: 'right',
-      marginRight: 10,
-      color: '#555',
-    },
-    hourDivider: {
-      flex: 1,
-      borderBottomWidth: 0.5,
-      borderBottomColor: '#E0E0E0',
-    },
-    eventBlock: {
-      position: 'absolute',
-      left: 70,
-      right: 20,
-      backgroundColor: '#007AFF33',
-      borderLeftColor: '#007AFF',
-      borderLeftWidth: 3,
-      borderRadius: 8,
-      padding: 8,
-    },
-    eventTitle: {
-      fontWeight: '600',
-      color: '#007AFF',
-    },
-    eventTime: {
-      color: '#333',
-      fontSize: 12,
-    },
-    // Week View Styles
-    weekContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      paddingVertical: 20,
-      backgroundColor: '#FFF',
-      flex: 1,
-    },
-    weekDay: {
-      alignItems: 'center',
-      flex: 1,
-    },
-    weekDayText: {
-      fontWeight: '600',
-      marginBottom: 8,
-    },
-    weekEventCard: {
-      backgroundColor: '#007AFF33',
-      borderRadius: 8,
-      padding: 8,
-      width: 70,
-      alignItems: 'center',
-    },
-    // Add Event Styles
-    flex: { 
-      flex: 1,
-      backgroundColor: '#fff' 
-    },
-    container: { flex: 1, backgroundColor: '#fff' },
-    scrollContent: { padding: 16 },
-    section: { marginTop: 16, gap: 8 },
-    h4: { fontWeight: '700', fontSize: 16 },
-    value: { color: '#333' },
-    label2: { fontWeight: '600', marginTop: 6 },
-    labelInline: { fontWeight: '600' },
-    input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
-    rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    muted: { color: '#666' },
-    eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
-    addEventTittle: { fontWeight: '600' },
-    addEventTime: { color: '#333' },
+  monthContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingTop: 20,
+  },
+  tabBar: {
+    backgroundColor: '#007AFF',
+  },
+  indicator: {
+    backgroundColor: 'white',
+    height: 3,
+  },
+  label: {
+    fontWeight: '600',
+    color: 'white',
+  },
+  // Day View Styles
+  dayScroll: {
+    flex: 1,
+    backgroundColor: '#ffffffff',
+  },
+  hourRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 60,
+    borderBottomColor: '#E0E0E0',
+    borderBottomWidth: 1,
+  },
+  hourText: {
+    width: 50,
+    textAlign: 'right',
+    marginRight: 10,
+    color: '#555',
+  },
+  hourDivider: {
+    flex: 1,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E0E0E0',
+  },
+  eventBlock: {
+    position: 'absolute',
+    left: 70,
+    right: 20,
+    backgroundColor: '#007AFF33',
+    borderLeftColor: '#007AFF',
+    borderLeftWidth: 3,
+    borderRadius: 8,
+    padding: 8,
+  },
+  eventTitle: {
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  eventTime: {
+    color: '#333',
+    fontSize: 12,
+  },
+  categoryText: {
+    width: 50,
+    textAlign: 'right',
+    marginRight: 10,
+    color: '#000',
+  },
+  // Week View Styles
+  weekContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 20,
+    backgroundColor: '#FFF',
+    flex: 1,
+  },
+  weekDay: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  weekDayText: {
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  weekEventCard: {
+    backgroundColor: '#007AFF33',
+    borderRadius: 8,
+    padding: 8,
+    width: 70,
+    alignItems: 'center',
+  },
+  // Add Event Styles
+  flex: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  scrollContent: { padding: 16 },
+  section: { marginTop: 16, gap: 8 },
+  h4: { fontWeight: '700', fontSize: 16 },
+  value: { color: '#333' },
+  label2: { fontWeight: '600', marginTop: 6 },
+  labelInline: { fontWeight: '600' },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  muted: { color: '#666' },
+  eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
+  addEventTittle: { fontWeight: '600' },
+  addEventTime: { color: '#333' },
+  addEventCategory: { color: '#000', marginTop: 4 },
 
-  
+  // Notifications
   content: {
     padding: 16,
   },
@@ -1232,3 +844,4 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
 });
+
