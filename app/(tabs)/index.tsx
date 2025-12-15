@@ -1079,8 +1079,6 @@ export default function CalendarScreen() {
             {...props}
             style={styles.tabBar}
             indicatorStyle={styles.indicator}
-          // labelStyle={styles.label}
-          //labelStyle={styles.label}
           />
         </SafeAreaView>
       )}
@@ -1090,11 +1088,33 @@ export default function CalendarScreen() {
 
 // ---------- Styles ----------
 const styles = StyleSheet.create({
-  monthContainer: {
+  // ---------- Layout ----------
+  flex: {
     flex: 1,
-    justifyContent: 'center',
-    paddingTop: 20,
+    backgroundColor: '#fff',
   },
+
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+
+  scrollContent: {
+    padding: 16,
+  },
+
+  section: {
+    marginTop: 16,
+    gap: 8,
+  },
+
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  // ---------- Tabs ----------
   tabBar: {
     backgroundColor: '#007AFF',
   },
@@ -1102,14 +1122,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     height: 3,
   },
-  label: {
-    fontWeight: '600',
-    color: 'white',
-  },
-  // Day View Styles
+
+  // ---------- Day View ----------
   dayScroll: {
     flex: 1,
-    backgroundColor: '#ffffffff',
+    backgroundColor: '#fff',
   },
   hourRow: {
     flexDirection: 'row',
@@ -1129,31 +1146,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#E0E0E0',
   },
-  eventBlock: {
-    position: 'absolute',
-    left: 70,
-    right: 20,
-    backgroundColor: '#007AFF33',
-    borderLeftColor: '#007AFF',
-    borderLeftWidth: 3,
-    borderRadius: 8,
-    padding: 8,
+
+  // ---------- Week View ----------
+  weekWrapper: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  eventTitle: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  eventTime: {
-    color: '#333',
-    fontSize: 12,
-  },
-  categoryText: {
-    width: 50,
-    textAlign: 'right',
-    marginRight: 10,
-    color: '#000',
-  },
-  // Week View Styles
+
   weekContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1161,44 +1160,77 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     flex: 1,
   },
+
   weekDay: {
     alignItems: 'center',
     flex: 1,
   },
+
   weekDayText: {
     fontWeight: '600',
     marginBottom: 8,
   },
-  weekEventCard: {
-    backgroundColor: '#007AFF33',
-    borderRadius: 8,
-    padding: 8,
-    width: 70,
-    alignItems: 'center',
-  },
-  // Add Event Styles
-  flex: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollContent: { padding: 16 },
-  section: { marginTop: 16, gap: 8 },
-  h4: { fontWeight: '700', fontSize: 16 },
-  value: { color: '#333' },
-  label2: { fontWeight: '600', marginTop: 6 },
-  labelInline: { fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  muted: { color: '#666' },
-  eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
-  addEventTittle: { fontWeight: '600' },
-  addEventTime: { color: '#333' },
-  addEventCategory: { color: '#000', marginTop: 4 },
 
-  // Notifications
-  content: {
-    padding: 16,
+  categoryText: {
+    width: 50,
+    textAlign: 'right',
+    marginRight: 10,
+    color: '#000',
+  },
+
+  // ---------- Event Cards ----------
+  eventCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+  },
+  addEventTittle: {
+    fontWeight: '600',
+  },
+  addEventTime: {
+    color: '#333',
+  },
+  addEventCategory: {
+    color: '#000',
+    marginTop: 4,
+  },
+
+  // ---------- Text ----------
+  h4: {
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  value: {
+    color: '#333',
+  },
+  label2: {
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  labelInline: {
+    fontWeight: '600',
+  },
+  muted: {
+    color: '#666',
+  },
+
+  // ---------- Inputs ----------
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 10,
+  },
+
+  // ---------- Notifications ----------
+  notificationsContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    flexDirection: 'column',
   },
   banner: {
     paddingVertical: 10,
@@ -1218,11 +1250,5 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
-  notificationsContainer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-    flexDirection: 'column',
-  },
 });
+
