@@ -16,11 +16,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TabView, TabBar } from 'react-native-tab-view';
-import AsyncStorage from 'expo-sqlite/kv-store';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as SQLite from 'expo-sqlite';
 import { Picker } from '@react-native-picker/picker';
+import { useTasks } from "../utils/TaskContext";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SQLite from 'expo-sqlite';
 
 // --- Types ---
 type DayPress = { dateString: string; day: number; month: number; year: number; timestamp: number };
@@ -41,6 +42,13 @@ const randomId = () => Math.random().toString(36).slice(2) + Date.now().toString
 
 // --- ICS Utilities ---
 const pad2 = (n: number) => String(n).padStart(2, '0');
+
+const parseLocalDate = (dateString: string) => {
+  if (!dateString) return new Date(NaN);
+  const [y, m, d] = dateString.split("-").map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+};
+
 const formatDateBasic = (d: Date) =>
   `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}`;
 const formatDateTimeUTC = (d: Date) =>
@@ -65,6 +73,14 @@ function flattenEvents(evMap: EventsByDate): EventItem[] {
     }
   }
   return out;
+}
+
+function formatTime(date: Date, is24: boolean) {
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: !is24,
+  });
 }
 
 function buildICS(evMap: EventsByDate) {
@@ -130,40 +146,381 @@ async function exportICS(evMap: EventsByDate) {
 }
 
 // Day View (Hour-by-hour timeline)
-const DayRoute = () => {
-  const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+const DayRoute = ({ events = {}, tasks = [], selected, timeFormat24 }) => {
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  const buildBlocks = () => {
+    if (!selected) return [];
+
+    const selectedDate = parseLocalDate(selected);
+    const blocks: any[] = [];
+
+    // ---- Calendar Events ----
+    Object.entries(events).forEach(([dateKey, eventList]) => {
+      if (dateKey !== selected) return; // Only show events for selected day
+
+      eventList.forEach(ev => {
+        const start = new Date(ev.start);
+        const end = new Date(ev.end);
+
+        // Skip multi-day events for now (optional: we can support later)
+        if (
+          start.toDateString() !== selectedDate.toDateString()
+        ) return;
+
+        const startMinutes = start.getHours() * 60 + start.getMinutes();
+        const endMinutes = end.getHours() * 60 + end.getMinutes();
+        const duration = endMinutes - startMinutes;
+
+        blocks.push({
+          id: ev.id,
+          title: ev.title,
+          top: startMinutes,
+          height: duration,
+          startTime: start,
+          endTime: end,
+          color: "#007AFF33",
+          borderColor: "#007AFF",
+        });
+      });
+    });
+
+    // ---- Tasks ----
+    tasks.forEach(task => {
+      const d = task.getDTstart();
+      const y = parseInt(d.substring(0, 4));
+      const m = parseInt(d.substring(4, 6));
+      const day = parseInt(d.substring(6, 8));
+      const hr = parseInt(d.substring(9, 11));
+      const min = parseInt(d.substring(11, 13));
+
+      const start = new Date(y, m - 1, day, hr, min);
+
+      if (start.toDateString() !== selectedDate.toDateString()) return;
+
+      const endStr = task.getDTend();
+      const endH = parseInt(endStr.substring(9, 11));
+      const endM = parseInt(endStr.substring(11, 13));
+      const end = new Date(y, m - 1, day, endH, endM);
+
+      const startMinutes = hr * 60 + min;
+      const duration = (endH - hr) * 60 + (endM - min);
+
+      blocks.push({
+        id: task.getUid(),
+        title: task.getSummary(),
+        top: startMinutes,
+        height: duration,
+        startTime: start,
+        endTime: end,
+        color: "#34C75933",
+        borderColor: "#34C759",
+      });
+    });
+
+    return blocks;
+  };
+
+  const blocks = buildBlocks();
+
+  // Format time labels inside event boxes
+  const fmt = (date) => {
+    if (timeFormat24) {
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  };
 
   return (
-    <ScrollView style={styles.dayScroll}>
-      {hours.map((hour) => (
-        <View key={hour} style={styles.hourRow}>
-          <Text style={styles.hourText}>{hour}</Text>
-          <View style={styles.hourDivider} />
-        </View>
-      ))}
-      {/* Example event block */}
-      <View style={[styles.eventBlock, { top: 200, height: 80 }]}>
-        <Text style={styles.eventTitle}>Team Meeting</Text>
-        <Text style={styles.eventTime}>9:00 – 10:00 AM</Text>
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+
+      {/* ---- DATE HEADER ---- */}
+      <View style={{
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderColor: "#ddd",
+        backgroundColor: "#f8f8f8"
+      }}>
+        <Text style={{ fontSize: 20, fontWeight: "700" }}>
+          {parseLocalDate(selected).toLocaleDateString("en-US", {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+            year: "numeric"
+          })}
+        </Text>
       </View>
-    </ScrollView>
+
+      {/* ---- SCROLLABLE DAY GRID ---- */}
+      <ScrollView style={styles.dayScroll} contentContainerStyle={{ height: 60 * 24 }}>
+        {hours.map(hour => (
+          <View key={hour} style={styles.hourRow}>
+            <Text style={styles.hourText}>
+              {timeFormat24
+                ? `${hour.toString().padStart(2, "0")}:00`
+                : new Date(0, 0, 0, hour).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+            </Text>
+            <View style={styles.hourDivider} />
+          </View>
+        ))}
+
+        {/* blocks */}
+        {blocks.map(b => (
+          <View
+            key={b.id}
+            style={{
+              position: "absolute",
+              left: 70,
+              right: 20,
+              top: b.top,
+              height: b.height,
+              backgroundColor: b.color,
+              borderLeftWidth: 4,
+              borderLeftColor: b.borderColor,
+              borderRadius: 8,
+              padding: 6,
+            }}
+          >
+            <Text style={{ fontWeight: "600", color: "#003" }}>{b.title}</Text>
+            <Text style={{ fontSize: 11, color: "#333" }}>
+              {fmt(b.startTime)} – {fmt(b.endTime)}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 };
 
-// Week View in a 7-day horizontal layout
-const WeekRoute = () => {
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WeekRoute = ({ events = {}, timeFormat24, weekAnchorDate, setWeekAnchorDate }) => {
+  const { tasks } = useTasks();
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+  /* Build Week Dates (Sun → Sat) */
+  const today = new Date();
+  const startOfWeek = new Date(weekAnchorDate);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+
+    return {
+      label: d.toLocaleDateString("en-US", { weekday: "short" }),
+      dayNum: d.getDate(),
+      isToday:
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate(),
+      dateObj: d,
+    };
+  });
+
+  /*Convert events & tasks into blocks */
+  const blocks = [];
+
+  // Build calendar event blocks for all 7 days
+  weekDays.forEach((wd, dayIndex) => {
+    const dateKey = wd.dateObj.toISOString().split("T")[0];
+
+    const dayEvents = events[dateKey] ?? [];
+
+    dayEvents.forEach(ev => {
+      const start = new Date(ev.start);
+      const end = new Date(ev.end);
+
+      const hour = start.getHours();
+      const minute = start.getMinutes();
+
+      const duration = (end.getTime() - start.getTime()) / 60000;
+
+      blocks.push({
+        id: ev.id,
+        title: ev.title,
+        dayIndex,
+        top: hour * 60 + minute,
+        height: duration,
+        color: "#007AFF33",
+        border: "#007AFF",
+        startTime: start,
+        endTime: end,
+      });
+    });
+  });
+
+  // Task events
+  tasks.forEach((task) => {
+    const d = task.getDTstart();
+    const y = parseInt(d.substring(0, 4));
+    const m = parseInt(d.substring(4, 6)) - 1;
+    const da = parseInt(d.substring(6, 8));
+    const h = parseInt(d.substring(9, 11));
+    const mm = parseInt(d.substring(11, 13));
+
+    const dObj = new Date(y, m, da);
+    const dayIndex = dObj.getDay();
+
+    const endStr = task.getDTend();
+    const eh = parseInt(endStr.substring(9, 11));
+    const em = parseInt(endStr.substring(11, 13));
+    const duration = (eh - h) * 60 + (em - mm);
+
+    blocks.push({
+      id: task.getUid(),
+      title: task.getSummary(),
+      dayIndex,
+      top: h * 60 + mm,
+      height: duration,
+      color: "#34C75933",
+      border: "#34C759",
+    });
+  });
+
+  /** RENDERS WEEK VIEW  */
   return (
-    <View style={styles.weekContainer}>
-      {days.map((day) => (
-        <View key={day} style={styles.weekDay}>
-          <Text style={styles.weekDayText}>{day}</Text>
-          <View style={styles.weekEventCard}>
-            <Text style={styles.eventTitle}>Sample Event</Text>
-            <Text style={styles.eventTime}>10 AM</Text>
+    <View style={{ flex: 1, backgroundColor: "#fff" }}>
+
+      {/* WEEKDAY HEADER */}
+      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#ddd" }}>
+        {/* Hour column spacer */}
+        <View style={{ width: 40 }} />
+
+        {/* Days */}
+        <View style={{ flexDirection: "row", flex: 1 }}>
+          {weekDays.map((d, idx) => (
+            <View key={idx} style={{ flex: 1, alignItems: "center" }}>
+              <View
+                style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: d.isToday ? "#007AFF22" : "transparent",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontWeight: "700", color: d.isToday ? "#007AFF" : "#000" }}>
+                  {d.label}
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: "600" }}>
+                  {d.dayNum}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* WEEK NAV BAR */}
+      <View style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 12,
+        paddingVertical: 10,           //chaging 8 to 10
+        borderBottomWidth: 1,
+        borderColor: "#ddd",
+        backgroundColor: "#f8f8f8",
+      }}>
+        <Text
+          onPress={() =>
+            setWeekAnchorDate(prev => {
+              const d = new Date(prev);
+              d.setDate(d.getDate() - 7);
+              return d;
+            })
+          }
+          style={{ fontSize: 18 }}
+        >
+          ←
+        </Text>
+
+        <Text style={{ fontWeight: "700", fontSize: 16 }}>
+          {startOfWeek.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })}{" "}
+          –{" "}
+          {new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + 6)
+            .toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+        </Text>
+
+        <Text
+          onPress={() =>
+            setWeekAnchorDate(prev => {
+              const d = new Date(prev);
+              d.setDate(d.getDate() + 7);
+              return d;
+            })
+          }
+          style={{ fontSize: 18 }}
+        >
+          →
+        </Text>
+      </View>
+      
+      {/* Body */}
+      <ScrollView style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row" }}>
+
+          {/* Hour labels */}
+          <View>
+            {HOURS.map((hr) => {
+              const label = timeFormat24
+                ? `${hr.toString().padStart(2, "0")}:00`
+                : new Date(2020, 0, 1, hr, 0).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                });
+
+              return (
+                <View key={hr} style={{ height: 60, justifyContent: "flex-start" }}>
+                  <Text style={{ width: 40, textAlign: "right", marginRight: 4, color: "#666" }}>
+                    {label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* 7 columns */}
+          <View style={{ flexDirection: "row", flex: 1 }}>
+            {weekDays.map((_, columnIndex) => (
+              <View key={columnIndex} style={{ width: `${100 / 7}%`, borderLeftWidth: 1, borderColor: "#eee" }}>
+
+                {/* Column events */}
+                {blocks
+                  .filter((b) => b.dayIndex === columnIndex)
+                  .map((b) => (
+                    <View
+                      key={b.id}
+                      style={{
+                        position: "absolute",
+                        top: b.top,
+                        height: b.height,
+                        left: 2,
+                        right: 2,
+                        backgroundColor: b.color,
+                        borderLeftColor: b.border,
+                        borderLeftWidth: 4,
+                        borderRadius: 6,
+                        padding: 4,
+                      }}
+                    >
+                      <Text style={{ fontWeight: "600", fontSize: 12 }}>{b.title}</Text>
+                    </View>
+                  ))}
+              </View>
+            ))}
           </View>
         </View>
-      ))}
+      </ScrollView>
     </View>
   );
 };
@@ -183,6 +540,8 @@ type MonthRouteProps = {
   removeEvent: (dateKey: string, id: string) => void;
   addEventLocal: () => void;
   exportICS: () => void;
+  timeFormat24: boolean;
+  setTimeFormat24: (v: boolean) => void;
 
   // Form props
   title: string;
@@ -213,32 +572,9 @@ type MonthRouteProps = {
 const MonthRoute = (props: MonthRouteProps) => {
   const insets = useSafeAreaInsets();
   const {
-    selected,
-    markedDates,
-    setSelected,
-    eventsForSelected,
-    removeEvent,
-    addEventLocal,
-    exportICS: handleExportICS,
-    title,
-    setTitle,
-    allDay,
-    setAllDay,
-    startHour,
-    setStartHour,
-    endHour,
-    setEndHour,
-    multiDay,
-    setMultiDay,
-    daysLong,
-    setDaysLong,
-    category,
-    setCategory,
-    categories,
-    newCategory,
-    setNewCategory,
-    addCategory,
-    notifications,
+    selected, markedDates, setSelected, eventsForSelected, removeEvent,
+    addEventLocal, exportICS: handleExportICS, title, setTitle, allDay, setAllDay,
+    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong, category, setCategory, categories, newCategory, setNewCategory, addCategory, notifications, timeFormat24, setTimeFormat24
   } = props;
 
   return (
@@ -249,7 +585,8 @@ const MonthRoute = (props: MonthRouteProps) => {
         keyboardVerticalOffset={insets.top + 48} // Adjusted offset to clear TabBar/Safe Area
       >
         {/* Notification stack */}
-        {notifications.length > 0 && (
+        {Array.isArray(notifications) && notifications.length > 0 && (
+
           <View
             style={[styles.notificationsContainer, { top: insets.top + 8 }]}
             pointerEvents="none"
@@ -381,10 +718,12 @@ const MonthRoute = (props: MonthRouteProps) => {
               </>
             )}
 
-            <Button
-              title="Add to in-app calendar"
-              onPress={addEventLocal}
-              disabled={!selected}
+            <Button title="Add to in-app calendar" onPress={addEventLocal} disabled={!selected} />
+          </View>
+
+          <View style={styles.rowBetween}>
+            <Text style={styles.labelInline}>24-hour time</Text>
+            <Switch value={timeFormat24} onValueChange={setTimeFormat24}
             />
           </View>
 
@@ -397,18 +736,17 @@ const MonthRoute = (props: MonthRouteProps) => {
                 const start = new Date(ev.start);
                 const end = new Date(ev.end);
                 const timeText = ev.allDay
-                  ? `All-day${
-                      start.toDateString() !== end.toDateString()
-                        ? ` (${start.toDateString()} → ${end.toDateString()})`
-                        : ''
-                    }`
+                  ? `All-day${start.toDateString() !== end.toDateString()
+                    ? ` (${start.toDateString()} → ${end.toDateString()})`
+                    : ''
+                  }`
                   : `${start.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })} — ${end.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}`;
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })} — ${end.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`;
 
                 return (
                   <View key={ev.id} style={styles.eventCard}>
@@ -435,6 +773,19 @@ const MonthRoute = (props: MonthRouteProps) => {
 // ---------- Main Calendar Screen ----------
 export default function CalendarScreen() {
   const layout = Dimensions.get('window');
+  const [timeFormat24, setTimeFormat24] = useState(true);
+  useEffect(() => {
+    (async () => {
+      const saved = await AsyncStorage.getItem("timeFormat24");
+      if (saved !== null) setTimeFormat24(saved === "true");
+    })();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem("timeFormat24", String(timeFormat24));
+  }, [timeFormat24]);
+
+  const { tasks } = useTasks();
   const [index, setIndex] = useState(2); // start with Month
   const [routes] = useState([
     { key: 'day', title: 'Day' },
@@ -444,6 +795,11 @@ export default function CalendarScreen() {
 
   const [selected, setSelected] = useState('');
   const [events, setEvents] = useState<EventsByDate>({});
+
+  const [weekAnchorDate, setWeekAnchorDate] = useState<Date>(() => {   //test
+    return selected ? parseLocalDate(selected) : new Date();
+  });
+
 
   // simple form state
   const [title, setTitle] = useState('');
@@ -475,7 +831,7 @@ export default function CalendarScreen() {
   }, []);
 
   useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events)).catch(() => { });
   }, [events]);
 
   // load & persist categories
@@ -496,7 +852,7 @@ export default function CalendarScreen() {
   }, []);
 
   useEffect(() => {
-    AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => {});
+    AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => { });
   }, [categories]);
 
   const addCategory = useCallback(() => {
@@ -515,6 +871,12 @@ export default function CalendarScreen() {
   }, [newCategory]);
 
   const MAX_DOTS = 3;
+
+  useEffect(() => {
+    if (selected) {
+      setWeekAnchorDate(parseLocalDate(selected));
+    }
+  }, [selected]);
 
   const markedDates = useMemo(() => {
     const out: Record<string, any> = {};
@@ -647,9 +1009,26 @@ export default function CalendarScreen() {
   const renderScene = ({ route }: { route: { key: string } }) => {
     switch (route.key) {
       case 'day':
-        return <DayRoute />;
+        return (
+          <DayRoute
+            events={events}
+            tasks={tasks}
+            selected={selected}
+            timeFormat24={timeFormat24}
+          />
+        );
       case 'week':
-        return <WeekRoute />;
+        return (
+          <WeekRoute
+            events={events}
+            timeFormat24={timeFormat24}
+
+            weekAnchorDate={weekAnchorDate}
+            setWeekAnchorDate={setWeekAnchorDate}
+          //        selected={selected}
+          />
+        );
+
       case 'month':
         return (
           <MonthRoute
@@ -679,6 +1058,8 @@ export default function CalendarScreen() {
             setNewCategory={setNewCategory}
             addCategory={addCategory}
             notifications={notifications}
+            timeFormat24={timeFormat24}
+            setTimeFormat24={setTimeFormat24}
           />
         );
       default:
@@ -698,7 +1079,6 @@ export default function CalendarScreen() {
             {...props}
             style={styles.tabBar}
             indicatorStyle={styles.indicator}
-            // labelStyle={styles.label}
           />
         </SafeAreaView>
       )}
@@ -708,11 +1088,33 @@ export default function CalendarScreen() {
 
 // ---------- Styles ----------
 const styles = StyleSheet.create({
-  monthContainer: {
+  // ---------- Layout ----------
+  flex: {
     flex: 1,
-    justifyContent: 'center',
-    paddingTop: 20,
+    backgroundColor: '#fff',
   },
+
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+
+  scrollContent: {
+    padding: 16,
+  },
+
+  section: {
+    marginTop: 16,
+    gap: 8,
+  },
+
+  rowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  // ---------- Tabs ----------
   tabBar: {
     backgroundColor: '#007AFF',
   },
@@ -720,14 +1122,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     height: 3,
   },
-  label: {
-    fontWeight: '600',
-    color: 'white',
-  },
-  // Day View Styles
+
+  // ---------- Day View ----------
   dayScroll: {
     flex: 1,
-    backgroundColor: '#ffffffff',
+    backgroundColor: '#fff',
   },
   hourRow: {
     flexDirection: 'row',
@@ -747,31 +1146,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#E0E0E0',
   },
-  eventBlock: {
-    position: 'absolute',
-    left: 70,
-    right: 20,
-    backgroundColor: '#007AFF33',
-    borderLeftColor: '#007AFF',
-    borderLeftWidth: 3,
-    borderRadius: 8,
-    padding: 8,
+
+  // ---------- Week View ----------
+  weekWrapper: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
-  eventTitle: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  eventTime: {
-    color: '#333',
-    fontSize: 12,
-  },
-  categoryText: {
-    width: 50,
-    textAlign: 'right',
-    marginRight: 10,
-    color: '#000',
-  },
-  // Week View Styles
+
   weekContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -779,44 +1160,77 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     flex: 1,
   },
+
   weekDay: {
     alignItems: 'center',
     flex: 1,
   },
+
   weekDayText: {
     fontWeight: '600',
     marginBottom: 8,
   },
-  weekEventCard: {
-    backgroundColor: '#007AFF33',
-    borderRadius: 8,
-    padding: 8,
-    width: 70,
-    alignItems: 'center',
-  },
-  // Add Event Styles
-  flex: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollContent: { padding: 16 },
-  section: { marginTop: 16, gap: 8 },
-  h4: { fontWeight: '700', fontSize: 16 },
-  value: { color: '#333' },
-  label2: { fontWeight: '600', marginTop: 6 },
-  labelInline: { fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  muted: { color: '#666' },
-  eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
-  addEventTittle: { fontWeight: '600' },
-  addEventTime: { color: '#333' },
-  addEventCategory: { color: '#000', marginTop: 4 },
 
-  // Notifications
-  content: {
-    padding: 16,
+  categoryText: {
+    width: 50,
+    textAlign: 'right',
+    marginRight: 10,
+    color: '#000',
+  },
+
+  // ---------- Event Cards ----------
+  eventCard: {
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+  },
+  addEventTittle: {
+    fontWeight: '600',
+  },
+  addEventTime: {
+    color: '#333',
+  },
+  addEventCategory: {
+    color: '#000',
+    marginTop: 4,
+  },
+
+  // ---------- Text ----------
+  h4: {
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  value: {
+    color: '#333',
+  },
+  label2: {
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  labelInline: {
+    fontWeight: '600',
+  },
+  muted: {
+    color: '#666',
+  },
+
+  // ---------- Inputs ----------
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 10,
+  },
+
+  // ---------- Notifications ----------
+  notificationsContainer: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    flexDirection: 'column',
   },
   banner: {
     paddingVertical: 10,
@@ -835,13 +1249,6 @@ const styles = StyleSheet.create({
   bannerText: {
     color: 'white',
     fontWeight: '600',
-  },
-  notificationsContainer: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-    flexDirection: 'column',
   },
 });
 
