@@ -16,13 +16,12 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import { TabView, TabBar } from 'react-native-tab-view';
-import AsyncStorage from 'expo-sqlite/kv-store';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as SQLite from 'expo-sqlite';
 import { Picker } from '@react-native-picker/picker';
 import { useTasks } from "../utils/TaskContext";
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SQLite from 'expo-sqlite';
 
 // --- Types ---
 type DayPress = { dateString: string; day: number; month: number; year: number; timestamp: number };
@@ -383,28 +382,34 @@ const WeekRoute = ({ events = {}, timeFormat24, weekAnchorDate, setWeekAnchorDat
   return (
     <View style={{ flex: 1, backgroundColor: "#fff" }}>
 
-      {/* Header */}
-      <View style={styles.weekHeaderRow}>
-        {weekDays.map((d, idx) => (
-          <View key={idx} style={{ width: `${100 / 7}%`, alignItems: "center" }}>
-            <View
-              style={{
-                paddingHorizontal: 6,
-                paddingVertical: 4,
-                borderRadius: 12,
-                backgroundColor: d.isToday ? "#007AFF22" : "transparent",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontWeight: "700", color: d.isToday ? "#007AFF" : "#000" }}>
-                {d.label}
-              </Text>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: d.isToday ? "#007AFF" : "#000" }}>
-                {d.dayNum}
-              </Text>
+      {/* WEEKDAY HEADER */}
+      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderColor: "#ddd" }}>
+        {/* Hour column spacer */}
+        <View style={{ width: 40 }} />
+
+        {/* Days */}
+        <View style={{ flexDirection: "row", flex: 1 }}>
+          {weekDays.map((d, idx) => (
+            <View key={idx} style={{ flex: 1, alignItems: "center" }}>
+              <View
+                style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  backgroundColor: d.isToday ? "#007AFF22" : "transparent",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontWeight: "700", color: d.isToday ? "#007AFF" : "#000" }}>
+                  {d.label}
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: "600" }}>
+                  {d.dayNum}
+                </Text>
+              </View>
             </View>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
 
       {/* WEEK NAV BAR */}
@@ -413,7 +418,7 @@ const WeekRoute = ({ events = {}, timeFormat24, weekAnchorDate, setWeekAnchorDat
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10,           //chaging 8 to 10
         borderBottomWidth: 1,
         borderColor: "#ddd",
         backgroundColor: "#f8f8f8",
@@ -458,7 +463,7 @@ const WeekRoute = ({ events = {}, timeFormat24, weekAnchorDate, setWeekAnchorDat
           →
         </Text>
       </View>
-
+      
       {/* Body */}
       <ScrollView style={{ flex: 1 }}>
         <View style={{ flexDirection: "row" }}>
@@ -569,7 +574,7 @@ const MonthRoute = (props: MonthRouteProps) => {
   const {
     selected, markedDates, setSelected, eventsForSelected, removeEvent,
     addEventLocal, exportICS: handleExportICS, title, setTitle, allDay, setAllDay,
-    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong, timeFormat24, setTimeFormat24
+    startHour, setStartHour, endHour, setEndHour, multiDay, setMultiDay, daysLong, setDaysLong, category, setCategory, categories, newCategory, setNewCategory, addCategory, notifications, timeFormat24, setTimeFormat24
   } = props;
 
   return (
@@ -580,7 +585,8 @@ const MonthRoute = (props: MonthRouteProps) => {
         keyboardVerticalOffset={insets.top + 48} // Adjusted offset to clear TabBar/Safe Area
       >
         {/* Notification stack */}
-        {notifications.length > 0 && (
+        {Array.isArray(notifications) && notifications.length > 0 && (
+
           <View
             style={[styles.notificationsContainer, { top: insets.top + 8 }]}
             pointerEvents="none"
@@ -730,18 +736,17 @@ const MonthRoute = (props: MonthRouteProps) => {
                 const start = new Date(ev.start);
                 const end = new Date(ev.end);
                 const timeText = ev.allDay
-                  ? `All-day${
-                      start.toDateString() !== end.toDateString()
-                        ? ` (${start.toDateString()} → ${end.toDateString()})`
-                        : ''
-                    }`
+                  ? `All-day${start.toDateString() !== end.toDateString()
+                    ? ` (${start.toDateString()} → ${end.toDateString()})`
+                    : ''
+                  }`
                   : `${start.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })} — ${end.toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}`;
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })} — ${end.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`;
 
                 return (
                   <View key={ev.id} style={styles.eventCard}>
@@ -847,7 +852,7 @@ export default function CalendarScreen() {
   }, []);
 
   useEffect(() => {
-    AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => {});
+    AsyncStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(categories)).catch(() => { });
   }, [categories]);
 
   const addCategory = useCallback(() => {
@@ -1034,15 +1039,27 @@ export default function CalendarScreen() {
             removeEvent={removeEvent}
             addEventLocal={handleAddEventLocalWithNotification}
             exportICS={handleExportICS}
+            title={title}
+            setTitle={setTitle}
+            allDay={allDay}
+            setAllDay={setAllDay}
+            startHour={startHour}
+            setStartHour={setStartHour}
+            endHour={endHour}
+            setEndHour={setEndHour}
+            multiDay={multiDay}
+            setMultiDay={setMultiDay}
+            daysLong={daysLong}
+            setDaysLong={setDaysLong}
+            category={category}
+            setCategory={setCategory}
+            categories={categories}
+            newCategory={newCategory}
+            setNewCategory={setNewCategory}
+            addCategory={addCategory}
+            notifications={notifications}
             timeFormat24={timeFormat24}
             setTimeFormat24={setTimeFormat24}
-
-            title={title} setTitle={setTitle}
-            allDay={allDay} setAllDay={setAllDay}
-            startHour={startHour} setStartHour={setStartHour}
-            endHour={endHour} setEndHour={setEndHour}
-            multiDay={multiDay} setMultiDay={setMultiDay}
-            daysLong={daysLong} setDaysLong={setDaysLong}
           />
         );
       default:
@@ -1062,7 +1079,7 @@ export default function CalendarScreen() {
             {...props}
             style={styles.tabBar}
             indicatorStyle={styles.indicator}
-            // labelStyle={styles.label}
+          // labelStyle={styles.label}
           //labelStyle={styles.label}
           />
         </SafeAreaView>
@@ -1209,145 +1226,3 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
 });
-  monthContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingTop: 20,
-  },
-  tabBar: {
-    backgroundColor: '#007AFF',
-  },
-  indicator: {
-    backgroundColor: 'white',
-    height: 3,
-  },
-  label: {
-    fontWeight: '600',
-    color: 'white',
-  },
-  // Day View Styles
-  dayScroll: {
-    flex: 1,
-    backgroundColor: '#ffffffff',
-  },
-  hourRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-    borderBottomColor: '#E0E0E0',
-    borderBottomWidth: 1,
-  },
-  hourText: {
-    width: 50,
-    textAlign: 'right',
-    marginRight: 10,
-    color: '#555',
-  },
-  hourDivider: {
-    flex: 1,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#E0E0E0',
-  },
-  eventBlock: {
-    position: 'absolute',
-    left: 70,
-    right: 20,
-    backgroundColor: '#007AFF33',
-    borderLeftColor: '#007AFF',
-    borderLeftWidth: 3,
-    borderRadius: 8,
-    padding: 8,
-  },
-  eventTitle: {
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  eventTime: {
-    color: '#333',
-    fontSize: 12,
-  },
-  // Week View Styles
-  // WEEK VIEW (Google Calendar Style)
-  weekWrapper: { flex: 1, backgroundColor: "#fff" },
-
-  weekHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#f7f7f7",
-  },
-  weekHeaderText: {
-    width: `${100 / 7}%`,
-    textAlign: "center",
-    fontWeight: "700",
-  },
-
-  weekGrid: {
-    flex: 1,
-    flexDirection: "row",
-  },
-  weekHourRow: {
-    position: "absolute",
-    width: "100%",
-    flexDirection: "row",
-    height: 60,
-  },
-  weekHourLabel: {
-    width: 40,
-    textAlign: "right",
-    color: "#666",
-    marginRight: 8,
-  },
-  weekHourDivider: {
-    flex: 1,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-  },
-
-  weekColumns: {
-    flexDirection: "row",
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-  },
-  weekColumn: {
-    width: `${100 / 7}%`,
-    borderRightWidth: 1,
-    borderColor: "#eee",
-  },
-
-  weekEventBlock: {
-    position: "absolute",
-    width: `${100 / 7}%`,
-    borderLeftWidth: 4,
-    padding: 4,
-    borderRadius: 6,
-  },
-  weekEventText: {
-    fontWeight: "600",
-    color: "#000",
-    fontSize: 12,
-  },
-
-  // Add Event Styles
-  flex: {
-    flex: 1,
-    backgroundColor: '#fff'
-  },
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollContent: { padding: 16 },
-  section: { marginTop: 16, gap: 8 },
-  h4: { fontWeight: '700', fontSize: 16 },
-  value: { color: '#333' },
-  label2: { fontWeight: '600', marginTop: 6 },
-  labelInline: { fontWeight: '600' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10 },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  muted: { color: '#666' },
-  eventCard: { borderWidth: 1, borderColor: '#eee', borderRadius: 10, padding: 10, marginTop: 10 },
-  addEventTittle: { fontWeight: '600' },
-  addEventTime: { color: '#333' },
-});
-
